@@ -3,8 +3,9 @@ import shutil
 import kagglehub
 import tensorflow as tf
 import numpy as np
-import keras_cv
+from tensorflow import keras
 import keras_hub
+from pathlib import Path
 
 # Model aliases and their Kaggle Hub paths
 MODEL_PATHS = {
@@ -47,7 +48,7 @@ def download_model(name, model_paths, model_dir):
     except Exception as e:
         print(f"❌ Failed to process {name}: {e}")
 
-def convert_segformer_to_tflite(model_dir: str):
+def convert_segformer_to_tflite():
     """
     Convert SegFormer model from KaggleHub to TFLite format.
     This function:
@@ -67,24 +68,24 @@ def convert_segformer_to_tflite(model_dir: str):
         print("✅ Successfully loaded SegFormer model")
 
         # Create model-specific directory
-        model_specific_dir = os.path.join(model_dir, "segformer_b0")
+        model_specific_dir = os.path.join(MODEL_DIR, "segformer_b0")
         os.makedirs(model_specific_dir, exist_ok=True)
-
+        
         # Export model to SavedModel directory
         saved_model_path = os.path.join(model_specific_dir, "keras")
         print(f"💾 Exporting SavedModel to {saved_model_path}...")
         model.export(saved_model_path)
         print("✅ SavedModel exported successfully")
-
+        
         # Convert to TFLite
         print("🔄 Converting to TFLite format...")
         converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_path)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         tflite_model = converter.convert()
         print("✅ TFLite conversion completed")
-
+        
         # Save TFLite model
-        tflite_path = os.path.join(model_specific_dir, "tflite", "1.tflite")
+        tflite_path = os.path.join(model_specific_dir, "tflite", "1.tflite")  # Changed to 1.tflite
         print(f"💾 Saving TFLite model to {tflite_path}...")
         os.makedirs(os.path.dirname(tflite_path), exist_ok=True)
         with open(tflite_path, "wb") as f:
@@ -97,14 +98,16 @@ def convert_segformer_to_tflite(model_dir: str):
         raise
 
 def main():
-    print("🚀 Starting Kaggle Hub model downloads...")
+    print("🚀 Starting model downloads...")
     os.makedirs(MODEL_DIR, exist_ok=True)
 
+    # Download models from Kaggle Hub
     for name, model_paths in MODEL_PATHS.items():
         download_model(name, model_paths, MODEL_DIR)
 
-    print("\n🚀 Building and converting SegFormer B0...")
-    convert_segformer_to_tflite(MODEL_DIR)
+    # Download and convert SegFormer from Kaggle
+    print("\n🚀 Downloading and converting SegFormer B0...")
+    convert_segformer_to_tflite()
 
     print("\n🎉 All models downloaded and converted successfully.")
 

@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmentation
+import os
 
 def preprocess_image(image_bgr, input_size=(512, 512)):
     """
@@ -200,26 +201,64 @@ def map_segformer_to_ade20k(predictions, true_classes=None):
 
 def run_segformer_inference(model, image):
     """Run inference using SegFormer model."""
-    # Initialize the image processor
-    image_processor = SegformerImageProcessor.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
+    if isinstance(model, tf.lite.Interpreter):
+        # TFLite model handling
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
+        
+        # Preprocess input
+        if len(input_details[0]['shape']) == 4:
+            inp = np.expand_dims(image, axis=0).astype(np.float32)
+        else:
+            inp = image.astype(np.float32)
+        
+        # Quantize if needed
+        if input_details[0]['dtype'] == np.int8:
+            scale, zp = input_details[0]['quantization']
+            inp = (inp / scale + zp).astype(np.int8)
+        
+        # Run inference
+        model.set_tensor(input_details[0]['index'], inp)
+        model.invoke()
+        
+        # Get raw output and handle shape
+        raw_out = model.get_tensor(output_details[0]['index'])
+        print(f"📊 TFLite raw output shape: {raw_out.shape}, dtype: {raw_out.dtype}")
+        
+        # Handle batch dimension if present
+        if raw_out.ndim == 4 and raw_out.shape[0] == 1:
+            raw_out = raw_out[0]
+        
+        # Get predictions
+        predictions = np.argmax(raw_out, axis=-1)
+        predictions_np = predictions.astype(np.int32)
+        
+    else:
+        # Keras model handling
+        # Preprocess the image
+        if len(image.shape) == 3:
+            inp = tf.expand_dims(image, 0)
+        else:
+            inp = image
+        
+        # Run inference using the serving function
+        outputs = model.signatures['serving_default'](inp)
+        
+        # Get predictions from the output tensor
+        logits = outputs['output_0']  # The output tensor name from the SavedModel
+        
+        predictions = tf.argmax(logits, axis=-1)
+        predictions_np = predictions[0].numpy().astype(np.int32)
     
-    # Preprocess the image
-    inputs = image_processor(images=image, return_tensors="tf")
-    
-    # Run inference
-    outputs = model(**inputs, training=False)
-    logits = outputs.logits
-    
-    # Get predictions
-    predictions = tf.argmax(logits, axis=-1)
-    predictions = predictions[0]  # Remove batch dimension
-    predictions_np = predictions.numpy().astype(np.int32)
-    
-    # Handle SegFormer specific shape
+    # Handle different output shapes
     if len(predictions_np.shape) == 1:
-        predictions_np = predictions_np.reshape(128, 128)
-    elif len(predictions_np.shape) == 3 and predictions_np.shape[0] == 1:
-        predictions_np = predictions_np[0]
+        # Reshape to 512x512
+        predictions_np = predictions_np.reshape(512, 512)
+    
+    # Resize to match input image size if needed
+    if predictions_np.shape != image.shape[:2]:
+        predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
+                                  interpolation=cv2.INTER_NEAREST)
     
     return predictions_np
 
@@ -410,21 +449,42 @@ def run_inference_on_image(model, image, model_name=None, true_classes=None, gro
     print(f"Returning predictions of shape: {predictions_np.shape}")
     return predictions_np
 
-def load_segformer_model(model_path=None):
+def load_segformer_model(model_path=None, use_tflite=False):
     """
-    Load SegFormer model from Hugging Face.
+    Load SegFormer model from local path.
     
     Args:
-        model_path: Optional path to a local model. If None, downloads from Hugging Face.
+        model_path: Optional path to a local model. If None, uses default local path.
+        use_tflite: Whether to load the TFLite version of the model.
         
     Returns:
         Loaded SegFormer model
     """
     if model_path is None:
-        # Use the pre-trained model from Hugging Face
-        model = TFSegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
+        if use_tflite:
+            model_path = "models/segformer_b0/tflite/model.tflite"
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(
+                    f"TFLite model not found at {model_path}. "
+                    "Please run download_models.py first to download and convert the model."
+                )
+            # Load TFLite model
+            interpreter = tf.lite.Interpreter(model_path=model_path)
+            interpreter.allocate_tensors()
+            return interpreter
+        else:
+            model_path = "models/segformer_b0/keras"
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(
+                    f"Keras model not found at {model_path}. "
+                    "Please run download_models.py first to download and convert the model."
+                )
+            # Load Keras model
+            return tf.saved_model.load(model_path)
     else:
-        # Load from local path
-        model = TFSegformerForSemanticSegmentation.from_pretrained(model_path)
-    
-    return model
+        if use_tflite:
+            interpreter = tf.lite.Interpreter(model_path=model_path)
+            interpreter.allocate_tensors()
+            return interpreter
+        else:
+            return tf.saved_model.load(model_path)
