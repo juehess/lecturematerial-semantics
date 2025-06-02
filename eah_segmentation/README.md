@@ -11,6 +11,11 @@ The package can be installed in different ways depending on your use case:
 For local development, including running the Jupyter notebooks:
 
 ```bash
+# Create and activate conda environment
+conda env create -f environment.yml
+conda activate eah_segmentation
+
+# Install package with development dependencies
 pip install -e ".[dev]"
 ```
 
@@ -18,23 +23,18 @@ This installs all development dependencies including Jupyter, matplotlib, and pa
 
 ### Raspberry Pi Deployment
 
-For deploying on a Raspberry Pi (without notebooks):
+For deploying on a Raspberry Pi with Coral EdgeTPU:
 
 ```bash
-pip install -e ".[raspberry]"
+# Create and activate conda environment
+conda env create -f environment_raspberry.yml
+conda activate eah_segmentation_raspberry
+
+# Install package
+pip install -e .
 ```
 
-This installs only the necessary dependencies for running inference on the Raspberry Pi.
-
-### Coral EdgeTPU Support
-
-If you're using a Coral EdgeTPU:
-
-```bash
-pip install -e ".[coral]"
-```
-
-This installs the TFLite runtime and Coral EdgeTPU support.
+This installs the necessary dependencies for running inference on the Raspberry Pi with Coral EdgeTPU support.
 
 ## Downloading Models and Dataset
 
@@ -65,25 +65,56 @@ python -c "from eah_segmentation.ade20k_utils import download_ade20k; download_a
 
 ## Usage
 
-### Local Development
+### Jupyter Notebooks
 
-1. Start Jupyter:
+The project includes two Jupyter notebooks for different purposes:
+
+1. `notebooks/presentation_demo.ipynb`:
+   - Designed for presentations and demonstrations
+   - Runs models and visualizes results
+   - Includes performance metrics and comparisons
+   - Can run inference on Raspberry Pi via SSH
+
+2. `notebooks/student_practice.ipynb`:
+   - Designed for student practice sessions
+   - Includes specific questions and tasks
+   - Guides through model usage and evaluation
+   - Helps understand semantic segmentation concepts
+
+To start working with the notebooks:
 ```bash
+# Start Jupyter
 jupyter notebook
-```
 
-2. Open either:
-   - `notebooks/presentation_demo.ipynb` for demonstration
-   - `notebooks/student_practice.ipynb` for practice exercises
+# Navigate to the notebooks directory
+cd notebooks
+```
 
 ### Raspberry Pi Deployment
 
-1. Copy the `infer.py` script to your Raspberry Pi
-2. Install the package with Raspberry Pi dependencies
-3. Run inference:
-```bash
-python infer.py --model model.tflite --input image.jpg --output out.png --log metrics.json
-```
+The notebooks can run inference on a Raspberry Pi with Coral EdgeTPU via SSH. To set this up:
+
+1. Ensure the Raspberry Pi is running and accessible via SSH
+2. In the notebooks, configure the SSH connection:
+   ```python
+   from eah_segmentation.ssh_utils import setup_ssh
+   
+   # Configure SSH connection
+   ssh_config = {
+       'hostname': 'raspberry_pi_ip',
+       'username': 'pi',
+       'password': 'your_password'  # Or use key-based authentication
+   }
+   ssh_client = setup_ssh(ssh_config)
+   ```
+
+3. Use the provided functions to run inference remotely:
+   ```python
+   from eah_segmentation.inference import run_remote_inference
+   
+   # Run inference on Raspberry Pi
+   results = run_remote_inference(ssh_client, model_name, image_path)
+   ```
 
 ### Testing Models
 To test the models on the ADE20K dataset:
@@ -120,9 +151,8 @@ The files are named `prediction_XXXX.png` where XXXX is the image index.
 ```
 eah_segmentation/
 ├── notebooks/              # Jupyter notebooks
-│   ├── presentation_demo.ipynb
-│   ├── student_practice.ipynb
-│   └── infer.py           # Inference script for Raspberry Pi
+│   ├── presentation_demo.ipynb  # For demonstrations
+│   └── student_practice.ipynb   # For student exercises
 ├── models/                # Model files
 ├── data/                  # Example images
 └── results/              # Output directory
@@ -130,10 +160,9 @@ eah_segmentation/
 
 ## Requirements
 
-- Python 3.7 or higher
+- Python 3.9 or higher
 - For local development: See `[project.optional-dependencies.dev]` in pyproject.toml
-- For Raspberry Pi: See `[project.optional-dependencies.raspberry]` in pyproject.toml
-- For Coral EdgeTPU: See `[project.optional-dependencies.coral]` in pyproject.toml
+- For Raspberry Pi: See environment_raspberry.yml
 
 ## License
 
