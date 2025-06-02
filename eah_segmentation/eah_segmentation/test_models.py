@@ -3,6 +3,9 @@ import tensorflow as tf
 import numpy as np
 from pathlib import Path
 import argparse
+import time
+import json
+from datetime import datetime
 
 # Try relative imports first, fall back to absolute imports
 try:
@@ -25,6 +28,9 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     """
     print(f"\n🔍 Evaluating model on {num_images} image{'s' if num_images > 1 else ''}...")
     
+    # Initialize timing statistics
+    inference_times = []
+    
     for i, (image, true_mask) in enumerate(dataset):
         if i >= num_images:
             break
@@ -38,8 +44,14 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
         for cls in true_classes:
             print(f"  Class {cls}")
         
-        # Run inference with ground truth classes
+        # Measure inference time
+        start_time = time.perf_counter()
         pred_mask = run_inference_on_image(model, image.numpy()[0], model_name, true_classes)
+        end_time = time.perf_counter()
+        inference_time = end_time - start_time
+        inference_times.append(inference_time)
+        
+        print(f"⏱️  Inference time: {inference_time:.3f} seconds")
         
         # Save visualization
         save_prediction(
@@ -51,6 +63,43 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
         )
         
         print(f"✅ Processed image {i+1}/{num_images}")
+    
+    # Calculate and print timing statistics
+    avg_time = np.mean(inference_times)
+    std_time = np.std(inference_times)
+    min_time = np.min(inference_times)
+    max_time = np.max(inference_times)
+    
+    print(f"\n📊 Timing Statistics for {model_name}:")
+    print(f"  Average inference time: {avg_time:.3f} ± {std_time:.3f} seconds")
+    print(f"  Min inference time: {min_time:.3f} seconds")
+    print(f"  Max inference time: {max_time:.3f} seconds")
+    
+    return {
+        'model_name': model_name,
+        'num_images': num_images,
+        'avg_time': avg_time,
+        'std_time': std_time,
+        'min_time': min_time,
+        'max_time': max_time,
+        'all_times': inference_times
+    }
+
+def save_timing_results(results, output_dir):
+    """Save timing results to a JSON file."""
+    # Create results directory if it doesn't exist
+    results_dir = Path(output_dir).parent / 'timing_results'
+    results_dir.mkdir(exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_file = results_dir / f'timing_results_{timestamp}.json'
+    
+    # Save results
+    with open(output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\n💾 Timing results saved to {output_file}")
 
 def main():
     parser = argparse.ArgumentParser(description='Test segmentation models on ADE20K dataset')
@@ -79,6 +128,9 @@ def main():
     # Skip to the desired image index
     dataset = dataset.skip(args.image_index)
     
+    # Store timing results for all models
+    all_results = []
+    
     # Test each model
     for model_name in args.models:
         print(f"\n🚀 Testing {model_name} ({args.model_type})...")
@@ -94,6 +146,9 @@ def main():
             continue
             
         try:
+            # Measure model loading time
+            load_start_time = time.perf_counter()
+            
             if args.model_type == 'tflite':
                 # Load TFLite model
                 tflite_path = model_dir / 'tflite' / '1.tflite'
@@ -115,12 +170,22 @@ def main():
                     print(f"❌ Keras model not found: {keras_path}")
                     continue
             
-            # Evaluate model
-            evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
+            load_end_time = time.perf_counter()
+            load_time = load_end_time - load_start_time
+            print(f"⏱️  Model loading time: {load_time:.3f} seconds")
+            
+            # Evaluate model and get timing results
+            timing_results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
+            timing_results['load_time'] = load_time
+            all_results.append(timing_results)
             
         except Exception as e:
             print(f"❌ Error testing {model_name}: {str(e)}")
             continue
+    
+    # Save all timing results
+    if all_results:
+        save_timing_results(all_results, output_dir)
 
 if __name__ == '__main__':
     main() 

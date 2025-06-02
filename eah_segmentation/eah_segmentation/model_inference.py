@@ -36,31 +36,16 @@ def run_segformer_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input
-        if len(input_details[0]['shape']) == 4:
-            inp = np.expand_dims(image, axis=0).astype(np.float32)
-        else:
-            inp = image.astype(np.float32)
-        
-        # Quantize if needed
-        if input_details[0]['dtype'] == np.int8:
-            scale, zp = input_details[0]['quantization']
-            inp = (inp / scale + zp).astype(np.int8)
+        # Preprocess input - simplified
+        inp = np.expand_dims(image, axis=0).astype(np.float32)
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
         model.invoke()
         
-        # Get raw output and handle shape
+        # Get predictions directly
         raw_out = model.get_tensor(output_details[0]['index'])
-        print(f"📊 TFLite raw output shape: {raw_out.shape}, dtype: {raw_out.dtype}")
-        
-        # Handle batch dimension if present
-        if raw_out.ndim == 4 and raw_out.shape[0] == 1:
-            raw_out = raw_out[0]
-        
-        # Get predictions
-        predictions = np.argmax(raw_out, axis=-1)
+        predictions = np.argmax(raw_out[0], axis=-1)
         predictions_np = predictions.astype(np.int32)
         
     else:
@@ -102,43 +87,17 @@ def run_deeplab_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input
-        if len(input_details[0]['shape']) == 4:
-            inp = np.expand_dims(image, axis=0).astype(np.float32)
-        else:
-            inp = image.astype(np.float32)
-        
-        # Quantize if needed
-        if input_details[0]['dtype'] == np.int8:
-            scale, zp = input_details[0]['quantization']
-            inp = (inp / scale + zp).astype(np.int8)
+        # Preprocess input - simplified
+        inp = np.expand_dims(image, axis=0).astype(np.float32)
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
         model.invoke()
         
-        # Get raw output and handle shape
+        # Get predictions directly
         raw_out = model.get_tensor(output_details[0]['index'])
-        print(f"📊 TFLite raw output shape: {raw_out.shape}, dtype: {raw_out.dtype}")
-        
-        # Handle batch dimension if present
-        if raw_out.ndim == 4 and raw_out.shape[0] == 1:
-            raw_out = raw_out[0]
-        elif raw_out.ndim == 3 and raw_out.shape[0] == 1:
-            raw_out = raw_out[0]
-        
-        # Handle class dimension if present
-        if raw_out.ndim == 3:
-            if raw_out.shape[-1] == 1:
-                raw_out = np.squeeze(raw_out, axis=-1)
-            else:
-                raw_out = np.argmax(raw_out, axis=-1)
-        
-        # Handle flattened output
-        if raw_out.ndim == 1:
-            raw_out = raw_out.reshape(512, 512)
-        
-        return raw_out.astype(np.int32)
+        predictions = np.argmax(raw_out[0], axis=-1)
+        return predictions.astype(np.int32)
     else:
         # Keras model handling
         if len(image.shape) == 3:
@@ -206,73 +165,32 @@ def run_mosaic_inference(model, image):
         # Get expected input size from model
         input_shape = input_details[0]['shape']
         expected_height, expected_width = input_shape[1:3]
-        print(f"📊 Expected input shape: {input_shape}")
-        print(f"📊 Output shape: {output_details[0]['shape']}")
-        print(f"📊 Number of output classes: {output_details[0]['shape'][-1]}")
         
         # Resize input to expected dimensions
         resized_image = cv2.resize(image, (expected_width, expected_height))
         
         # Convert to UINT8 (0-255 range) as required by the model
-        if len(input_shape) == 4:
-            inp = np.expand_dims(resized_image, axis=0)
-        else:
-            inp = resized_image
-        
-        # Convert to UINT8 (0-255 range)
+        inp = np.expand_dims(resized_image, axis=0)
         inp = (inp * 255).astype(np.uint8)
-        print(f"📊 Input shape after preprocessing: {inp.shape}, dtype: {inp.dtype}")
-        print(f"📊 Input range after preprocessing: [{np.min(inp)}, {np.max(inp)}]")
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
         model.invoke()
         
-        # Get raw output and handle shape
+        # Get predictions directly
         raw_out = model.get_tensor(output_details[0]['index'])
-        print(f"📊 TFLite raw output shape: {raw_out.shape}, dtype: {raw_out.dtype}")
-        
-        # Print class probabilities for a few pixels
-        if raw_out.ndim == 4:
-            print("\n📊 Sample class probabilities:")
-            for i in range(min(5, raw_out.shape[1])):
-                for j in range(min(5, raw_out.shape[2])):
-                    probs = raw_out[0, i, j]
-                    top_classes = np.argsort(probs)[-3:][::-1]  # Top 3 classes
-                    print(f"Pixel ({i},{j}) top classes: {top_classes} with probs: {probs[top_classes]}")
-        
-        # Handle batch dimension if present
-        if raw_out.ndim == 4 and raw_out.shape[0] == 1:
-            raw_out = raw_out[0]
-        elif raw_out.ndim == 3 and raw_out.shape[0] == 1:
-            raw_out = raw_out[0]
-        
-        # Handle class dimension if present
-        if raw_out.ndim == 3:
-            if raw_out.shape[-1] == 1:
-                raw_out = np.squeeze(raw_out, axis=-1)
-            else:
-                raw_out = np.argmax(raw_out, axis=-1)
-        
-        # Handle flattened output
-        if raw_out.ndim == 1:
-            raw_out = raw_out.reshape(expected_height, expected_width)
-        
-        print(f"📊 Raw predictions - unique values: {np.unique(raw_out)}")
-        print(f"📊 Raw prediction counts: {np.bincount(raw_out.flatten())}")
+        predictions = np.argmax(raw_out[0], axis=-1)
+        predictions_np = predictions.astype(np.int32)
         
         # Map predictions to ADE20K class indices
-        raw_out = map_mosaic_to_ade20k(raw_out)
-        
-        print(f"📊 Mapped predictions - unique values: {np.unique(raw_out)}")
-        print(f"📊 Mapped prediction counts: {np.bincount(raw_out.flatten())}")
+        predictions_np = map_mosaic_to_ade20k(predictions_np)
         
         # Resize back to original image size
-        if raw_out.shape != image.shape[:2]:
-            raw_out = cv2.resize(raw_out, (image.shape[1], image.shape[0]), 
-                               interpolation=cv2.INTER_NEAREST)
+        if predictions_np.shape != image.shape[:2]:
+            predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
+                                      interpolation=cv2.INTER_NEAREST)
         
-        return raw_out.astype(np.int32)
+        return predictions_np
     else:
         # Keras model handling
         if len(image.shape) == 3:
