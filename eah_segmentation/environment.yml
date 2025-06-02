@@ -8,14 +8,21 @@ dependencies:
   
   # Conda packages
   - pip
-  - numpy
-  - opencv
+  - numpy>=1.23.0
+  - opencv>=4.7.0
+  - pillow>=9.5.0
   - pip:
-      # Below are pip-based packages that conda might not have at the desired versions
-      - tensorflow>=2.8.0
-      - tensorflow-hub>=0.12.0
-      - tqdm~=4.65.0  # Pinned to match openxlab requirement
-      - tensorflow-io-gcs-filesystem>=0.24.0  # For TF Hub models
+      # Core dependencies
+      - tensorflow>=2.12.0
+      - tensorflow-hub>=0.13.0
+      - tensorflow-datasets>=4.9.0
+      - tensorflow-io-gcs-filesystem>=0.24.0
+      - kagglehub>=0.2.0
+      - transformers>=4.30.0
+      
+      # Model-specific dependencies
       - keras-cv>=0.5.10
-      - git+https://github.com/bonlime/keras-deeplab-v3-plus.git  # For DeepLab models
-      # Add any other pip-specific dependencies if needed
+      - git+https://github.com/bonlime/keras-deeplab-v3-plus.git
+      
+      # Utility packages
+      - tqdm>=4.65.0

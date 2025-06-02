@@ -64,6 +64,8 @@ def main():
                       help='Directory to save results')
     parser.add_argument('--data_dir', type=str, default='datasets',
                       help='Directory containing ADE20K dataset')
+    parser.add_argument('--image_index', type=int, default=0,
+                      help='Index of the image to test (default: 0)')
     args = parser.parse_args()
     
     # Create output directory
@@ -73,6 +75,9 @@ def main():
     # Load ADE20K dataset
     print(f"📥 Loading ADE20K dataset from {args.data_dir}")
     dataset = load_ade20k_dataset(args.data_dir)
+    
+    # Skip to the desired image index
+    dataset = dataset.skip(args.image_index)
     
     # Test each model
     for model_name in args.models:

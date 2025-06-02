@@ -150,6 +150,52 @@ def run_deeplab_inference(model, image):
             preds = preds[0]
         return preds[0].numpy().astype(np.int32)
 
+def map_mosaic_to_ade20k(predictions):
+    """
+    Map Mosaic class indices to ADE20K class indices.
+    The model uses ADE20K's 21-class subset.
+    
+    Args:
+        predictions: Mosaic predictions (H, W) with class indices
+        
+    Returns:
+        Mapped predictions to ADE20K class indices
+    """
+    # ADE20K 21-class subset mapping
+    # Class indices are 1-based in ADE20K
+    ade20k_21class = {
+        0: 0,     # background -> background
+        1: 1,     # wall
+        2: 2,     # building
+        3: 3,     # sky
+        4: 4,     # floor
+        5: 5,     # tree
+        6: 6,     # ceiling
+        7: 7,     # road
+        8: 8,     # bed
+        9: 9,     # windowpane
+        10: 10,   # grass
+        11: 11,   # cabinet
+        12: 12,   # sidewalk
+        13: 13,   # person
+        14: 14,   # earth
+        15: 15,   # door
+        16: 16,   # painting
+        17: 17,   # mountain
+        18: 18,   # plant
+        19: 19,   # curtain
+        20: 20,   # chair
+        21: 21,   # car
+    }
+    
+    # Create a mapping array for efficient lookup
+    mapping_array = np.zeros(max(ade20k_21class.keys()) + 1, dtype=np.int32)
+    for mosaic_idx, ade20k_idx in ade20k_21class.items():
+        mapping_array[mosaic_idx] = ade20k_idx
+    
+    # Map the predictions
+    return mapping_array[predictions]
+
 def run_mosaic_inference(model, image):
     """Run inference using Mosaic model."""
     if isinstance(model, tf.lite.Interpreter):
@@ -157,16 +203,26 @@ def run_mosaic_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input
-        if len(input_details[0]['shape']) == 4:
-            inp = np.expand_dims(image, axis=0).astype(np.float32)
-        else:
-            inp = image.astype(np.float32)
+        # Get expected input size from model
+        input_shape = input_details[0]['shape']
+        expected_height, expected_width = input_shape[1:3]
+        print(f"📊 Expected input shape: {input_shape}")
+        print(f"📊 Output shape: {output_details[0]['shape']}")
+        print(f"📊 Number of output classes: {output_details[0]['shape'][-1]}")
         
-        # Quantize if needed
-        if input_details[0]['dtype'] == np.int8:
-            scale, zp = input_details[0]['quantization']
-            inp = (inp / scale + zp).astype(np.int8)
+        # Resize input to expected dimensions
+        resized_image = cv2.resize(image, (expected_width, expected_height))
+        
+        # Convert to UINT8 (0-255 range) as required by the model
+        if len(input_shape) == 4:
+            inp = np.expand_dims(resized_image, axis=0)
+        else:
+            inp = resized_image
+        
+        # Convert to UINT8 (0-255 range)
+        inp = (inp * 255).astype(np.uint8)
+        print(f"📊 Input shape after preprocessing: {inp.shape}, dtype: {inp.dtype}")
+        print(f"📊 Input range after preprocessing: [{np.min(inp)}, {np.max(inp)}]")
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
@@ -175,6 +231,15 @@ def run_mosaic_inference(model, image):
         # Get raw output and handle shape
         raw_out = model.get_tensor(output_details[0]['index'])
         print(f"📊 TFLite raw output shape: {raw_out.shape}, dtype: {raw_out.dtype}")
+        
+        # Print class probabilities for a few pixels
+        if raw_out.ndim == 4:
+            print("\n📊 Sample class probabilities:")
+            for i in range(min(5, raw_out.shape[1])):
+                for j in range(min(5, raw_out.shape[2])):
+                    probs = raw_out[0, i, j]
+                    top_classes = np.argsort(probs)[-3:][::-1]  # Top 3 classes
+                    print(f"Pixel ({i},{j}) top classes: {top_classes} with probs: {probs[top_classes]}")
         
         # Handle batch dimension if present
         if raw_out.ndim == 4 and raw_out.shape[0] == 1:
@@ -191,7 +256,21 @@ def run_mosaic_inference(model, image):
         
         # Handle flattened output
         if raw_out.ndim == 1:
-            raw_out = raw_out.reshape(512, 512)
+            raw_out = raw_out.reshape(expected_height, expected_width)
+        
+        print(f"📊 Raw predictions - unique values: {np.unique(raw_out)}")
+        print(f"📊 Raw prediction counts: {np.bincount(raw_out.flatten())}")
+        
+        # Map predictions to ADE20K class indices
+        raw_out = map_mosaic_to_ade20k(raw_out)
+        
+        print(f"📊 Mapped predictions - unique values: {np.unique(raw_out)}")
+        print(f"📊 Mapped prediction counts: {np.bincount(raw_out.flatten())}")
+        
+        # Resize back to original image size
+        if raw_out.shape != image.shape[:2]:
+            raw_out = cv2.resize(raw_out, (image.shape[1], image.shape[0]), 
+                               interpolation=cv2.INTER_NEAREST)
         
         return raw_out.astype(np.int32)
     else:
@@ -200,10 +279,21 @@ def run_mosaic_inference(model, image):
             inp = tf.expand_dims(image, 0)
         else:
             inp = image
+        
+        # Convert to UINT8 (0-255 range) as required by the model
+        inp = (inp * 255).astype(np.uint8)
+        
         preds = model(inp, training=False)
         if isinstance(preds, tuple):
             preds = preds[0]
-        return preds[0].numpy().astype(np.int32)
+        
+        # Get class predictions
+        preds_np = np.argmax(preds[0].numpy(), axis=-1)
+        
+        # Map predictions to ADE20K class indices
+        preds_np = map_mosaic_to_ade20k(preds_np)
+        
+        return preds_np.astype(np.int32)
 
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
     """
