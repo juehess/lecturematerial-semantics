@@ -166,16 +166,49 @@ def run_mosaic_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
+        # Print detailed model information
+        print("\n📋 TFLite Model Details:")
+        print("\nInput Details:")
+        for i, detail in enumerate(input_details):
+            print(f"  Input {i}:")
+            print(f"    Name: {detail['name']}")
+            print(f"    Shape: {detail['shape']}")
+            print(f"    Type: {detail['dtype']}")
+            if 'quantization' in detail:
+                scale, zero_point = detail['quantization']
+                print(f"    Quantization: scale={scale}, zero_point={zero_point}")
+        
+        print("\nOutput Details:")
+        for i, detail in enumerate(output_details):
+            print(f"  Output {i}:")
+            print(f"    Name: {detail['name']}")
+            print(f"    Shape: {detail['shape']}")
+            print(f"    Type: {detail['dtype']}")
+            if 'quantization' in detail:
+                scale, zero_point = detail['quantization']
+                print(f"    Quantization: scale={scale}, zero_point={zero_point}")
+        
         # Get expected input size from model
         input_shape = input_details[0]['shape']
         expected_height, expected_width = input_shape[1:3]
+        print(f"\n📊 Expected input size: {expected_width}x{expected_height}")
         
         # Resize input to expected dimensions
         resized_image = cv2.resize(image, (expected_width, expected_height))
+        print(f"📊 Resized image shape: {resized_image.shape}")
         
         # Convert to UINT8 (0-255 range) as required by the model
         inp = np.expand_dims(resized_image, axis=0)
         inp = (inp * 255).astype(np.uint8)
+        
+        # Apply quantization if needed
+        if 'quantization' in input_details[0]:
+            scale, zero_point = input_details[0]['quantization']
+            if scale != 0:  # Only apply if quantization is active
+                inp = np.round(inp / scale + zero_point).astype(np.uint8)
+        
+        print(f"📊 Input tensor shape: {inp.shape}")
+        print(f"📊 Input tensor range: [{np.min(inp)}, {np.max(inp)}]")
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
@@ -183,11 +216,34 @@ def run_mosaic_inference(model, image):
         
         # Get predictions directly
         raw_out = model.get_tensor(output_details[0]['index'])
+        print(f"\n📊 Raw output shape: {raw_out.shape}")
+        print(f"📊 Raw output range: [{np.min(raw_out)}, {np.max(raw_out)}]")
+        
+        # Dequantize output if needed
+        if 'quantization' in output_details[0]:
+            scale, zero_point = output_details[0]['quantization']
+            if scale != 0:  # Only apply if quantization is active
+                raw_out = (raw_out.astype(np.float32) - zero_point) * scale
+        
         predictions = np.argmax(raw_out[0], axis=-1)
         predictions_np = predictions.astype(np.int32)
+        print(f"📊 Predictions shape: {predictions_np.shape}")
+        print(f"📊 Predictions range: [{np.min(predictions_np)}, {np.max(predictions_np)}]")
+        
+        # Print unique classes in predictions
+        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
+        print("\n📊 Predicted classes before mapping:")
+        for cls, count in zip(unique_classes, class_counts):
+            print(f"  Class {cls}: {count} pixels")
         
         # Map predictions to ADE20K class indices
         predictions_np = map_mosaic_to_ade20k(predictions_np)
+        
+        # Print unique classes after mapping
+        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
+        print("\n📊 Predicted classes after mapping:")
+        for cls, count in zip(unique_classes, class_counts):
+            print(f"  Class {cls}: {count} pixels")
         
         # Resize back to original image size
         if predictions_np.shape != image.shape[:2]:
@@ -196,7 +252,7 @@ def run_mosaic_inference(model, image):
         
         return predictions_np
     else:
-        # Keras model handling
+        # TensorFlow model handling
         if len(image.shape) == 3:
             inp = tf.expand_dims(image, 0)
         else:
@@ -205,12 +261,52 @@ def run_mosaic_inference(model, image):
         # Convert to UINT8 (0-255 range) as required by the model
         inp = (inp * 255).astype(np.uint8)
         
-        preds = model(inp, training=False)
-        if isinstance(preds, tuple):
-            preds = preds[0]
+        # Print available signatures
+        print("\n📋 Available model signatures:")
+        for signature_name, signature in model.signatures.items():
+            print(f"  - {signature_name}")
+            print(f"    Inputs: {signature.inputs}")
+            print(f"    Outputs: {signature.outputs}")
+        
+        # Try different signatures
+        try:
+            # First try serving_default
+            outputs = model.signatures['serving_default'](inp)
+            print("\n✅ Using 'serving_default' signature")
+        except Exception as e:
+            print(f"\n❌ Error with 'serving_default': {str(e)}")
+            try:
+                # Try predict
+                outputs = model.signatures['predict'](inp)
+                print("\n✅ Using 'predict' signature")
+            except Exception as e:
+                print(f"\n❌ Error with 'predict': {str(e)}")
+                try:
+                    # Try inference
+                    outputs = model.signatures['inference'](inp)
+                    print("\n✅ Using 'inference' signature")
+                except Exception as e:
+                    print(f"\n❌ Error with 'inference': {str(e)}")
+                    raise ValueError("No working signature found")
+        
+        # Get predictions from the output tensor
+        # Try different output names
+        output_names = ['output_0', 'logits', 'predictions', 'output']
+        logits = None
+        for name in output_names:
+            if name in outputs:
+                logits = outputs[name]
+                print(f"\n✅ Using output tensor: {name}")
+                break
+        
+        if logits is None:
+            print("\n❌ No known output tensor found. Available outputs:")
+            for name, tensor in outputs.items():
+                print(f"  - {name}: {tensor.shape}")
+            raise ValueError("No known output tensor found")
         
         # Get class predictions
-        preds_np = np.argmax(preds[0].numpy(), axis=-1)
+        preds_np = np.argmax(logits[0].numpy(), axis=-1)
         
         # Map predictions to ADE20K class indices
         preds_np = map_mosaic_to_ade20k(preds_np)
