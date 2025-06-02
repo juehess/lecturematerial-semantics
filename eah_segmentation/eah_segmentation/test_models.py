@@ -110,6 +110,8 @@ def main():
                       help='Directory containing ADE20K dataset')
     parser.add_argument('--image_index', type=int, default=0,
                       help='Index of the image to test (default: 0)')
+    parser.add_argument('--device', type=str, choices=['cpu', 'coral'], default='cpu',
+                      help='Device to run inference on (cpu or coral)')
     args = parser.parse_args()
     
     # Create output directory
@@ -128,10 +130,10 @@ def main():
     
     # Test each model
     for model_name in args.models:
-        print(f"\n🚀 Testing {model_name} ({args.model_type})...")
+        print(f"\n🚀 Testing {model_name} ({args.model_type}) on {args.device}...")
         
         # Create model-specific output directory
-        model_output_dir = output_dir / f"{model_name}_{args.model_type}"
+        model_output_dir = output_dir / f"{model_name}_{args.model_type}_{args.device}"
         model_output_dir.mkdir(exist_ok=True)
         
         # Load model
@@ -149,7 +151,19 @@ def main():
                 tflite_path = model_dir / 'tflite' / '1.tflite'
                 if tflite_path.exists():
                     print(f"📥 Loading TFLite model from {tflite_path}")
-                    interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+                    if args.device == 'coral':
+                        try:
+                            interpreter = tf.lite.Interpreter(
+                                model_path=str(tflite_path),
+                                experimental_delegates=[tf.lite.load_delegate('libedgetpu.so.1')]
+                            )
+                            print("✅ Successfully loaded model on Coral TPU")
+                        except Exception as e:
+                            print(f"❌ Failed to load model on Coral TPU: {str(e)}")
+                            print("⚠️ Falling back to CPU")
+                            interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+                    else:
+                        interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
                     interpreter.allocate_tensors()
                     model = interpreter
                 else:
@@ -172,6 +186,7 @@ def main():
             # Evaluate model and get timing results
             timing_results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
             timing_results['load_time'] = load_time
+            timing_results['device'] = args.device
             all_results.append(timing_results)
             
             # Save timing results for this model
