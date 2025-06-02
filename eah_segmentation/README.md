@@ -42,8 +42,8 @@ To download the models, run:
 # Create models directory
 mkdir -p models
 
-# Download models (this will be handled automatically by the package)
-python -c "from eah_segmentation.model_download import download_models; download_models()"
+# Download models
+python -m eah_segmentation.download_models
 ```
 
 ### ADE20K Dataset
