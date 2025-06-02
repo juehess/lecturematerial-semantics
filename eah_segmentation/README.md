@@ -1,33 +1,40 @@
 # EAH Semantic Segmentation
 
-This package demonstrates semantic segmentation using multiple models (SegFormer, DeepLabV3+, and Mosaic) on the ADE20K dataset.
+A demonstration of semantic segmentation with multiple models using TensorFlow, with support for deployment on embedded systems like Raspberry Pi and Coral EdgeTPU.
 
 ## Installation
 
-### Prerequisites
-- Python 3.7 or higher
-- pip or conda
+The package can be installed in different ways depending on your use case:
 
-### Using pip
+### Local Development (with Jupyter Notebooks)
+
+For local development, including running the Jupyter notebooks:
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/eah_segmentation.git
-cd eah_segmentation
-
-# Install the package
-pip install -e .
+pip install -e ".[dev]"
 ```
 
-### Using conda
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/eah_segmentation.git
-cd eah_segmentation
+This installs all development dependencies including Jupyter, matplotlib, and paramiko for SSH connections.
 
-# Create and activate conda environment
-conda env create -f environment.yml
-conda activate eah_segmentation
+### Raspberry Pi Deployment
+
+For deploying on a Raspberry Pi (without notebooks):
+
+```bash
+pip install -e ".[raspberry]"
 ```
+
+This installs only the necessary dependencies for running inference on the Raspberry Pi.
+
+### Coral EdgeTPU Support
+
+If you're using a Coral EdgeTPU:
+
+```bash
+pip install -e ".[coral]"
+```
+
+This installs the TFLite runtime and Coral EdgeTPU support.
 
 ## Downloading Models and Dataset
 
@@ -57,6 +64,26 @@ python -c "from eah_segmentation.ade20k_utils import download_ade20k; download_a
 ```
 
 ## Usage
+
+### Local Development
+
+1. Start Jupyter:
+```bash
+jupyter notebook
+```
+
+2. Open either:
+   - `notebooks/presentation_demo.ipynb` for demonstration
+   - `notebooks/student_practice.ipynb` for practice exercises
+
+### Raspberry Pi Deployment
+
+1. Copy the `infer.py` script to your Raspberry Pi
+2. Install the package with Raspberry Pi dependencies
+3. Run inference:
+```bash
+python infer.py --model model.tflite --input image.jpg --output out.png --log metrics.json
+```
 
 ### Testing Models
 To test the models on the ADE20K dataset:
@@ -89,35 +116,25 @@ For each processed image, a single visualization file is created in the model-sp
 The files are named `prediction_XXXX.png` where XXXX is the image index.
 
 ## Project Structure
+
 ```
 eah_segmentation/
-├── eah_segmentation/
-│   ├── __init__.py
-│   ├── ade20k_utils.py
-│   ├── model_download.py
-│   ├── model_inference.py
-│   └── test_models.py
-├── models/
-│   ├── segformer_b0/
-│   ├── deeplabv3plus_edgetpu/
-│   └── mosaic/
-├── datasets/
-│   └── ADE20K/
-├── results/
-├── requirements.txt
-├── environment.yml
-└── README.md
+├── notebooks/              # Jupyter notebooks
+│   ├── presentation_demo.ipynb
+│   ├── student_practice.ipynb
+│   └── infer.py           # Inference script for Raspberry Pi
+├── models/                # Model files
+├── data/                  # Example images
+└── results/              # Output directory
 ```
 
 ## Requirements
-- tensorflow>=2.12.0
-- tensorflow-hub>=0.13.0
-- tensorflow-datasets>=4.9.0
-- opencv-python>=4.7.0
-- numpy>=1.23.0
-- Pillow>=9.5.0
-- kagglehub>=0.2.0
-- transformers>=4.30.0
+
+- Python 3.7 or higher
+- For local development: See `[project.optional-dependencies.dev]` in pyproject.toml
+- For Raspberry Pi: See `[project.optional-dependencies.raspberry]` in pyproject.toml
+- For Coral EdgeTPU: See `[project.optional-dependencies.coral]` in pyproject.toml
 
 ## License
+
 This project is licensed under the MIT License - see the LICENSE file for details.

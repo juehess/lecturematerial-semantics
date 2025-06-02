@@ -1,0 +1,32 @@
+name: eah_segmentation_raspberry
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # System-level dependencies
+  - python=3.9
+  - pip
+  - numpy
+  - opencv
+  - pillow
+  
+  # Hardware-specific dependencies
+  - pip:
+      # TFLite and EdgeTPU runtimes
+      - tflite-runtime
+      - pycoral
+      
+      # Core ML framework
+      - tensorflow>=2.8.0
+      - tensorflow-hub
+      - tensorflow-datasets
+      - tensorflow-io-gcs-filesystem
+  - kagglehub>=0.2.0
+  - transformers>=4.30.0
+  
+  # Model-specific dependencies
+  - keras-cv>=0.5.10
+  - git+https://github.com/bonlime/keras-deeplab-v3-plus.git
+  
+  # Utility packages
+  - tqdm>=4.65.0 
