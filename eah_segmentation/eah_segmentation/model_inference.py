@@ -17,7 +17,7 @@ def preprocess_image(image_bgr, input_size=(512, 512)):
 def map_segformer_to_ade20k(predictions, true_classes=None):
     """
     Map SegFormer class indices to ADE20K class indices.
-    This is needed because SegFormer uses a different class mapping than ADE20K.
+    This is needed because SegFormer uses 0-based indexing while ADE20K uses 1-based indexing.
     
     Args:
         predictions: SegFormer predictions (H, W) with class indices
@@ -26,178 +26,8 @@ def map_segformer_to_ade20k(predictions, true_classes=None):
     Returns:
         Mapped predictions to ADE20K class indices
     """
-    # If no ground truth classes provided, use default mapping
-    if true_classes is None:
-        true_classes = [0, 1, 2, 3, 5, 7, 10, 18]  # Common ADE20K classes
-    
-    # Kaggle's SegFormer to ADE20K mapping based on actual output
-    segformer_to_ade20k = {
-        0: 0,    # background -> background
-        1: 1,    # wall -> wall
-        2: 2,    # building -> building
-        3: 3,    # sky -> sky
-        4: 5,    # floor -> tree (map to closest semantic class)
-        5: 5,    # tree -> tree
-        6: 3,    # ceiling -> sky (map to closest semantic class)
-        7: 7,    # road -> road
-        8: 1,    # bed -> wall (map to closest semantic class)
-        9: 10,   # windowpane -> grass (map to closest semantic class)
-        10: 10,  # grass -> grass
-        11: 1,   # cabinet -> wall (map to closest semantic class)
-        12: 7,   # sidewalk -> road (map to closest semantic class)
-        13: 18,  # person -> plant (map to closest semantic class)
-        14: 5,   # earth -> tree (map to closest semantic class)
-        15: 1,   # door -> wall (map to closest semantic class)
-        16: 1,   # table -> wall (map to closest semantic class)
-        17: 5,   # mountain -> tree (map to closest semantic class)
-        18: 18,  # plant -> plant
-        19: 1,   # curtain -> wall (map to closest semantic class)
-        20: 1,   # chair -> wall (map to closest semantic class)
-        21: 7,   # car -> road (map to closest semantic class)
-        22: 3,   # water -> sky (map to closest semantic class)
-        23: 1,   # painting -> wall (map to closest semantic class)
-        24: 1,   # sofa -> wall (map to closest semantic class)
-        25: 1,   # shelf -> wall (map to closest semantic class)
-        26: 2,   # house -> building
-        27: 3,   # sea -> sky
-        28: 1,   # mirror -> wall (map to closest semantic class)
-        29: 5,   # rug -> tree (map to closest semantic class)
-        30: 10,  # field -> grass
-        31: 1,   # armchair -> wall (map to closest semantic class)
-        32: 1,   # seat -> wall (map to closest semantic class)
-        33: 1,   # fence -> wall (map to closest semantic class)
-        34: 1,   # desk -> wall (map to closest semantic class)
-        35: 5,   # rock -> tree (map to closest semantic class)
-        36: 1,   # wardrobe -> wall (map to closest semantic class)
-        37: 1,   # lamp -> wall (map to closest semantic class)
-        38: 1,   # bathtub -> wall (map to closest semantic class)
-        39: 1,   # railing -> wall (map to closest semantic class)
-        40: 1,   # cushion -> wall (map to closest semantic class)
-        41: 1,   # base -> wall (map to closest semantic class)
-        42: 1,   # box -> wall (map to closest semantic class)
-        43: 1,   # column -> wall (map to closest semantic class)
-        44: 1,   # signboard -> wall (map to closest semantic class)
-        45: 1,   # chest of drawers -> wall (map to closest semantic class)
-        46: 1,   # counter -> wall (map to closest semantic class)
-        47: 5,   # sand -> tree (map to closest semantic class)
-        48: 1,   # sink -> wall (map to closest semantic class)
-        49: 2,   # skyscraper -> building
-        50: 1,   # fireplace -> wall (map to closest semantic class)
-        51: 1,   # refrigerator -> wall (map to closest semantic class)
-        52: 1,   # grandstand -> wall (map to closest semantic class)
-        53: 7,   # path -> road (map to closest semantic class)
-        54: 1,   # stairs -> wall (map to closest semantic class)
-        55: 7,   # runway -> road (map to closest semantic class)
-        56: 1,   # case -> wall (map to closest semantic class)
-        57: 1,   # pool table -> wall (map to closest semantic class)
-        58: 1,   # pillow -> wall (map to closest semantic class)
-        59: 1,   # screen door -> wall (map to closest semantic class)
-        60: 1,   # stairway -> wall (map to closest semantic class)
-        61: 3,   # river -> sky (map to closest semantic class)
-        62: 7,   # bridge -> road (map to closest semantic class)
-        63: 1,   # bookcase -> wall (map to closest semantic class)
-        64: 1,   # blind -> wall (map to closest semantic class)
-        65: 1,   # coffee table -> wall (map to closest semantic class)
-        66: 1,   # toilet -> wall (map to closest semantic class)
-        67: 18,  # flower -> plant
-        68: 1,   # book -> wall (map to closest semantic class)
-        69: 5,   # hill -> tree (map to closest semantic class)
-        70: 1,   # bench -> wall (map to closest semantic class)
-        71: 1,   # countertop -> wall (map to closest semantic class)
-        72: 1,   # stove -> wall (map to closest semantic class)
-        73: 18,  # palm -> plant
-        74: 1,   # kitchen island -> wall (map to closest semantic class)
-        75: 1,   # computer -> wall (map to closest semantic class)
-        76: 1,   # swivel chair -> wall (map to closest semantic class)
-        77: 3,   # boat -> sky (map to closest semantic class)
-        78: 1,   # bar -> wall (map to closest semantic class)
-        79: 1,   # arcade machine -> wall (map to closest semantic class)
-        80: 2,   # hovel -> building
-        81: 7,   # bus -> road (map to closest semantic class)
-        82: 1,   # towel -> wall (map to closest semantic class)
-        83: 1,   # light -> wall (map to closest semantic class)
-        84: 7,   # truck -> road (map to closest semantic class)
-        85: 2,   # tower -> building
-        86: 1,   # chandelier -> wall (map to closest semantic class)
-        87: 1,   # awning -> wall (map to closest semantic class)
-        88: 1,   # streetlight -> wall (map to closest semantic class)
-        89: 1,   # booth -> wall (map to closest semantic class)
-        90: 1,   # television receiver -> wall (map to closest semantic class)
-        91: 3,   # airplane -> sky (map to closest semantic class)
-        92: 7,   # dirt track -> road (map to closest semantic class)
-        93: 1,   # apparel -> wall (map to closest semantic class)
-        94: 1,   # pole -> wall (map to closest semantic class)
-        95: 5,   # land -> tree (map to closest semantic class)
-        96: 1,   # bannister -> wall (map to closest semantic class)
-        97: 1,   # escalator -> wall (map to closest semantic class)
-        98: 1,   # ottoman -> wall (map to closest semantic class)
-        99: 1,   # bottle -> wall (map to closest semantic class)
-        100: 1,  # buffet -> wall (map to closest semantic class)
-        101: 1,  # poster -> wall (map to closest semantic class)
-        102: 1,  # stage -> wall (map to closest semantic class)
-        103: 7,  # van -> road (map to closest semantic class)
-        104: 3,  # ship -> sky (map to closest semantic class)
-        105: 3,  # fountain -> sky (map to closest semantic class)
-        106: 1,  # conveyer belt -> wall (map to closest semantic class)
-        107: 1,  # canopy -> wall (map to closest semantic class)
-        108: 1,  # washer -> wall (map to closest semantic class)
-        109: 1,  # plaything -> wall (map to closest semantic class)
-        110: 3,  # swimming pool -> sky (map to closest semantic class)
-        111: 1,  # stool -> wall (map to closest semantic class)
-        112: 1,  # barrel -> wall (map to closest semantic class)
-        113: 1,  # basket -> wall (map to closest semantic class)
-        114: 3,  # waterfall -> sky (map to closest semantic class)
-        115: 1,  # tent -> wall (map to closest semantic class)
-        116: 1,  # bag -> wall (map to closest semantic class)
-        117: 7,  # minibike -> road (map to closest semantic class)
-        118: 1,  # cradle -> wall (map to closest semantic class)
-        119: 1,  # oven -> wall (map to closest semantic class)
-        120: 1,  # ball -> wall (map to closest semantic class)
-        121: 1,  # food -> wall (map to closest semantic class)
-        122: 1,  # step -> wall (map to closest semantic class)
-        123: 1,  # tank -> wall (map to closest semantic class)
-        124: 1,  # trade name -> wall (map to closest semantic class)
-        125: 1,  # microwave -> wall (map to closest semantic class)
-        126: 1,  # pot -> wall (map to closest semantic class)
-        127: 18, # animal -> plant (map to closest semantic class)
-        128: 7,  # bicycle -> road (map to closest semantic class)
-        129: 3,  # lake -> sky (map to closest semantic class)
-        130: 1,  # dishwasher -> wall (map to closest semantic class)
-        131: 1,  # screen -> wall (map to closest semantic class)
-        132: 1,  # blanket -> wall (map to closest semantic class)
-        133: 1,  # sculpture -> wall (map to closest semantic class)
-        134: 1,  # hood -> wall (map to closest semantic class)
-        135: 1,  # sconce -> wall (map to closest semantic class)
-        136: 1,  # vase -> wall (map to closest semantic class)
-        137: 1,  # traffic light -> wall (map to closest semantic class)
-        138: 1,  # tray -> wall (map to closest semantic class)
-        139: 1,  # ashcan -> wall (map to closest semantic class)
-        140: 1,  # fan -> wall (map to closest semantic class)
-        141: 3,  # pier -> sky (map to closest semantic class)
-        142: 1,  # crt screen -> wall (map to closest semantic class)
-        143: 1,  # plate -> wall (map to closest semantic class)
-        144: 1,  # monitor -> wall (map to closest semantic class)
-        145: 1,  # bulletin board -> wall (map to closest semantic class)
-        146: 1,  # shower -> wall (map to closest semantic class)
-        147: 1,  # radiator -> wall (map to closest semantic class)
-        148: 1,  # glass -> wall (map to closest semantic class)
-        149: 1,  # clock -> wall (map to closest semantic class)
-    }
-    
-    # Create a mapping array for efficient lookup
-    mapping_array = np.zeros(max(segformer_to_ade20k.keys()) + 1, dtype=np.int32)
-    for segformer_idx, ade20k_idx in segformer_to_ade20k.items():
-        # Only map to classes that exist in ground truth
-        if ade20k_idx in true_classes:
-            mapping_array[segformer_idx] = ade20k_idx
-        else:
-            # Map to the closest semantic class that exists in ground truth
-            mapping_array[segformer_idx] = 0  # Default to background
-    
-    # Map the predictions
-    mapped_predictions = mapping_array[predictions]
-    
-    return mapped_predictions
+    # Simply add 1 to all predictions to match ADE20K's 1-based indexing
+    return predictions + 1
 
 def run_segformer_inference(model, image):
     """Run inference using SegFormer model."""
@@ -254,6 +84,9 @@ def run_segformer_inference(model, image):
     if len(predictions_np.shape) == 1:
         # Reshape to 512x512
         predictions_np = predictions_np.reshape(512, 512)
+    
+    # Map predictions to ADE20K class indices
+    predictions_np = map_segformer_to_ade20k(predictions_np)
     
     # Resize to match input image size if needed
     if predictions_np.shape != image.shape[:2]:
