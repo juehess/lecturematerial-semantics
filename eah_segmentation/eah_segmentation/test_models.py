@@ -86,14 +86,9 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     }
 
 def save_timing_results(results, output_dir):
-    """Save timing results to a JSON file."""
-    # Create results directory if it doesn't exist
-    results_dir = Path(output_dir).parent / 'timing_results'
-    results_dir.mkdir(exist_ok=True)
-    
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = results_dir / f'timing_results_{timestamp}.json'
+    """Save timing results to a JSON file in the same directory as predictions."""
+    # Save results in the same directory as predictions
+    output_file = Path(output_dir) / 'timing_results.json'
     
     # Save results
     with open(output_file, 'w') as f:
@@ -179,11 +174,14 @@ def main():
             timing_results['load_time'] = load_time
             all_results.append(timing_results)
             
+            # Save timing results for this model
+            save_timing_results([timing_results], model_output_dir)
+            
         except Exception as e:
             print(f"❌ Error testing {model_name}: {str(e)}")
             continue
     
-    # Save all timing results
+    # Save combined timing results for all models
     if all_results:
         save_timing_results(all_results, output_dir)
 
