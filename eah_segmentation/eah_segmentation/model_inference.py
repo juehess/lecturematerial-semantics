@@ -36,7 +36,7 @@ def run_segformer_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input - simplified
+        # Preprocess input - SegFormer TFLite uses float32
         inp = np.expand_dims(image, axis=0).astype(np.float32)
         
         # Run inference
@@ -87,8 +87,12 @@ def run_deeplab_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input - simplified
+        # Preprocess input with quantization for DeepLab
         inp = np.expand_dims(image, axis=0).astype(np.float32)
+        
+        # DeepLab TFLite model uses INT8 quantization
+        scale, zp = input_details[0]['quantization']
+        inp = (inp / scale + zp).astype(np.int8)
         
         # Run inference
         model.set_tensor(input_details[0]['index'], inp)
