@@ -41,29 +41,33 @@ def load_ade20k_dataset(data_dir, batch_size=1):
     print("📥 Loading ADE20K dataset...")
     
     data_dir = Path(data_dir)
-    val_dir = data_dir / "validation"
+    ade_dir = data_dir / "ADEChallengeData2016"
     
-    if not val_dir.exists():
-        raise ValueError(f"Validation directory not found: {val_dir}")
+    if not ade_dir.exists():
+        raise ValueError(f"ADE20K directory not found: {ade_dir}")
     
     # Get list of image files
-    image_files = sorted((val_dir / "images").glob("*.jpg"))
-    mask_files = sorted((val_dir / "annotations").glob("*.png"))
+    image_files = sorted((ade_dir / "images" / "validation").glob("*.jpg"))
+    mask_files = sorted((ade_dir / "annotations" / "validation").glob("*.png"))
     
     if not image_files or not mask_files:
         raise ValueError("No images or masks found in validation directory")
     
     print(f"Found {len(image_files)} validation images")
     
+    # Convert Path objects to strings
+    image_files = [str(f) for f in image_files]
+    mask_files = [str(f) for f in mask_files]
+    
     def load_and_preprocess(image_path, mask_path):
         # Load image
-        image = tf.io.read_file(str(image_path))
+        image = tf.io.read_file(image_path)
         image = tf.image.decode_jpeg(image, channels=3)
         image = tf.image.resize(image, ADE20K_CONFIG['input_size'])
         image = tf.cast(image, tf.float32) / 255.0
         
         # Load mask
-        mask = tf.io.read_file(str(mask_path))
+        mask = tf.io.read_file(mask_path)
         mask = tf.image.decode_png(mask, channels=1)
         mask = tf.image.resize(mask, ADE20K_CONFIG['input_size'], 
                              method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
