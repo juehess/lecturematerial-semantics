@@ -6,6 +6,7 @@ import numpy as np
 from tensorflow import keras
 import keras_hub
 from pathlib import Path
+import cv2
 
 # Model aliases and their Kaggle Hub paths
 MODEL_PATHS = {
@@ -48,13 +49,41 @@ def download_model(name, model_paths, model_dir):
     except Exception as e:
         print(f"❌ Failed to process {name}: {e}")
 
+def representative_dataset_gen():
+    """Generate representative dataset for quantization."""
+    # Load a few images from the dataset
+    dataset_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'ADE20K')
+    image_dir = os.path.join(dataset_path, 'images', 'training')
+    
+    # Get list of image files
+    image_files = [f for f in os.listdir(image_dir) if f.endswith(('.jpg', '.png'))][:10]
+    
+    for image_file in image_files:
+        # Load and preprocess image
+        image_path = os.path.join(image_dir, image_file)
+        image = cv2.imread(image_path)
+        if image is None:
+            continue
+            
+        # Resize to model input size
+        image = cv2.resize(image, (512, 512))
+        
+        # Convert to RGB and normalize
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = image.astype(np.float32) / 255.0
+        
+        # Add batch dimension
+        image = np.expand_dims(image, axis=0)
+        
+        yield [image]
+
 def convert_segformer_to_tflite():
     """
     Convert SegFormer model from KaggleHub to TFLite format.
     This function:
     1. Loads the SegFormer model from KaggleHub
     2. Exports it as a TensorFlow SavedModel
-    3. Converts it to TFLite format
+    3. Converts it to TFLite format with optimizations
     4. Saves the TFLite model
     """
     print("\n🚀 Starting SegFormer B0 conversion process...")
@@ -77,15 +106,33 @@ def convert_segformer_to_tflite():
         model.export(saved_model_path)
         print("✅ SavedModel exported successfully")
         
-        # Convert to TFLite
-        print("🔄 Converting to TFLite format...")
+        # Convert to TFLite with optimizations
+        print("🔄 Converting to TFLite format with optimizations...")
         converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_path)
+        
+        # Enable optimizations
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        
+        # Enable hardware acceleration and optimizations
+        converter.target_spec.supported_ops = [
+            tf.lite.OpsSet.TFLITE_BUILTINS,
+            tf.lite.OpsSet.SELECT_TF_OPS
+        ]
+        
+        # Enable INT8 quantization with representative dataset
+        converter.target_spec.supported_ops.append(tf.lite.OpsSet.TFLITE_BUILTINS_INT8)
+        converter.representative_dataset = representative_dataset_gen
+        
+        # Set optimization flags
+        converter.target_spec.supported_types = [tf.float16]
+        converter.allow_custom_ops = True
+        
+        # Convert the model
         tflite_model = converter.convert()
         print("✅ TFLite conversion completed")
         
         # Save TFLite model
-        tflite_path = os.path.join(model_specific_dir, "tflite", "1.tflite")  # Changed to 1.tflite
+        tflite_path = os.path.join(model_specific_dir, "tflite", "1.tflite")
         print(f"💾 Saving TFLite model to {tflite_path}...")
         os.makedirs(os.path.dirname(tflite_path), exist_ok=True)
         with open(tflite_path, "wb") as f:
