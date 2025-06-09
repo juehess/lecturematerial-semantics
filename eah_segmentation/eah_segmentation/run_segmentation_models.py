@@ -45,7 +45,17 @@ MODELS = {
 }
 
 def preprocess_image(image_path, target_size, preprocess_type='normalize'):
-    """Preprocess image for model input"""
+    """
+    Preprocesses an image for model input based on model-specific requirements.
+    
+    Args:
+        image_path (str): Path to input image
+        target_size (tuple): Desired output size (height, width)
+        preprocess_type (str): Type of preprocessing ('normalize', 'xception', 'mobilenet')
+        
+    Returns:
+        np.ndarray: Preprocessed image ready for model input
+    """
     # Read image
     img = cv2.imread(image_path)
     if img is None:
@@ -73,7 +83,16 @@ def preprocess_image(image_path, target_size, preprocess_type='normalize'):
     return img
 
 def load_model_from_path(model_name, model_dir):
-    """Load model from local directory"""
+    """
+    Loads a model from local directory based on model name.
+    
+    Args:
+        model_name (str): Name of the model to load
+        model_dir (str): Base directory containing model files
+        
+    Returns:
+        tf.keras.Model: Loaded model instance
+    """
     try:
         # Map model names to their paths
         model_paths = {
@@ -99,7 +118,18 @@ def load_model_from_path(model_name, model_dir):
         return None
 
 def colorize_mask(mask, num_classes=19):
-    """Colorize the segmentation mask"""
+    """
+    Converts a segmentation mask to a colored visualization.
+    
+    Uses the Cityscapes color palette for visualization.
+    
+    Args:
+        mask (np.ndarray): Segmentation mask
+        num_classes (int): Number of classes in the mask
+        
+    Returns:
+        np.ndarray: Colored visualization of the mask
+    """
     # Cityscapes color palette
     palette = np.array([
         [128, 64, 128],   # road

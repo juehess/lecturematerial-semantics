@@ -5,8 +5,37 @@ from pathlib import Path
 import argparse
 import shutil
 
+"""
+eah_segmentation/download_dataset.py
+
+This module handles the downloading and organization of the ADE20K dataset.
+It provides functionality to download the dataset from official sources,
+extract it, and organize it into a consistent directory structure.
+
+Key Features:
+- Downloads dataset with progress tracking
+- Handles both images and annotations
+- Verifies downloads and extracts
+- Organizes files into a standardized structure
+- Provides detailed progress and error reporting
+"""
+
 def download_file(url, output_path):
-    """Download a file with progress bar"""
+    """
+    Downloads a file from a URL with progress tracking.
+    
+    Key Features:
+        - Shows download progress bar
+        - Handles network errors gracefully
+        - Verifies downloaded file integrity
+        
+    Args:
+        url (str): URL to download from
+        output_path (Path): Path to save the downloaded file
+        
+    Returns:
+        bool: True if download successful, False otherwise
+    """
     try:
         print(f"📥 Starting download from {url}")
         response = requests.get(url, stream=True)
@@ -48,7 +77,19 @@ def download_file(url, output_path):
         return False
 
 def verify_dataset(data_dir):
-    """Verify that the dataset is properly organized"""
+    """
+    Verifies that the ADE20K dataset is properly organized.
+    
+    Checks for two possible structures:
+    1. Organized: validation/images and validation/annotations
+    2. Unorganized: ADEChallengeData2016/images/validation and annotations/validation
+    
+    Args:
+        data_dir (Path): Directory containing the dataset
+        
+    Returns:
+        bool: True if dataset structure is valid
+    """
     data_dir = Path(data_dir)
     
     # Check for organized structure (validation/images and validation/annotations)
@@ -73,7 +114,20 @@ def verify_dataset(data_dir):
 
 def download_ade20k(output_dir):
     """
-    Download ADE20K dataset from the official source.
+    Downloads and organizes the complete ADE20K dataset.
+    
+    Key Operations:
+        1. Downloads dataset files from MIT CSAIL servers
+        2. Extracts downloaded zip files
+        3. Organizes files into standardized structure
+        4. Verifies dataset integrity
+        5. Provides detailed progress information
+    
+    Args:
+        output_dir (Path): Directory to save the dataset
+        
+    Returns:
+        bool: True if download and organization successful
     """
     print("🚀 Starting ADE20K dataset download...")
     

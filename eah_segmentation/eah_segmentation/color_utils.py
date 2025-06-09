@@ -2,10 +2,39 @@
 
 import numpy as np
 
+"""
+This module provides utilities for colorizing segmentation masks using
+the Cityscapes color palette. It's primarily used for visualizing
+semantic segmentation predictions.
+
+Key Features:
+- Implements Cityscapes color scheme
+- Efficient vectorized color mapping
+- Handles invalid class indices
+"""
+
 def colorize_mask(seg_mask):
     """
-    Convert a segmentation mask (HxW with class indices) to a color image (HxWx3).
-    Using the Cityscapes color palette.
+    Converts a segmentation mask to a colored visualization using Cityscapes colors.
+    
+    Color Palette:
+        - Background: Black (0, 0, 0)
+        - Road: Purple-Gray (128, 64, 128)
+        - Sidewalk: Pink (244, 35, 232)
+        - Building: Dark Gray (70, 70, 70)
+        - Wall: Blue-Gray (102, 102, 156)
+        - And 15 more classes...
+    
+    Key Features:
+        - Vectorized implementation for efficiency
+        - Clips invalid class indices
+        - Uses standard Cityscapes colors
+    
+    Args:
+        seg_mask (np.ndarray): Segmentation mask of shape (H, W) with class indices
+        
+    Returns:
+        np.ndarray: Colored mask of shape (H, W, 3) with RGB values
     """
     # Cityscapes color palette
     palette = [

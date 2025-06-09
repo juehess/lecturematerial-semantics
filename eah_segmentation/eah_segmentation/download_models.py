@@ -8,6 +8,24 @@ import keras_hub
 from pathlib import Path
 import cv2
 
+"""
+eah_segmentation/download_models.py
+
+This module handles the downloading and conversion of various segmentation models from Kaggle Hub.
+It manages three types of models:
+1. DeepLabV3+ EdgeTPU (both Keras and TFLite formats)
+2. Mosaic (TFLite format)
+3. SegFormer B0 (converts from Keras to TFLite format)
+
+The module provides functionality to download pre-trained models, organize them in a consistent
+directory structure, and perform model conversion with optimizations.
+
+Constants:
+    MODEL_PATHS (dict): Dictionary mapping model names to their Kaggle Hub paths for different formats
+    BASE_DIR (str): Base directory path of the current module
+    MODEL_DIR (str): Directory path where all models will be stored
+"""
+
 # Model aliases and their Kaggle Hub paths
 MODEL_PATHS = {
     "deeplabv3plus_edgetpu": {
@@ -24,7 +42,22 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "..", "models")
 
 def download_model(name, model_paths, model_dir):
-    """Download model files from Kaggle Hub and organize them in a consistent structure"""
+    """
+    Downloads model files from Kaggle Hub and organizes them in a consistent directory structure.
+    
+    Args:
+        name (str): Name of the model to download (e.g., 'deeplabv3plus_edgetpu', 'mosaic')
+        model_paths (dict): Dictionary containing paths for different formats of the model
+        model_dir (str): Base directory where models should be stored
+    
+    Key Operations:
+        1. Creates model-specific directories
+        2. Downloads each format (keras/tflite) from Kaggle Hub
+        3. Organizes downloaded files into format-specific subdirectories
+    
+    Raises:
+        Exception: If download or file organization fails
+    """
     print(f"\n🔄 Downloading {name} from Kaggle Hub...")
     
     # Create model-specific directory
@@ -50,7 +83,21 @@ def download_model(name, model_paths, model_dir):
         print(f"❌ Failed to process {name}: {e}")
 
 def representative_dataset_gen():
-    """Generate representative dataset for quantization."""
+    """
+    Generates a representative dataset for model quantization.
+    
+    This generator function loads and preprocesses a small set of training images
+    from the ADE20K dataset to use as calibration data for quantization.
+    
+    Key Operations:
+        1. Loads first 10 images from ADE20K training set
+        2. Resizes images to 512x512
+        3. Converts to RGB and normalizes pixel values
+        4. Adds batch dimension
+    
+    Yields:
+        list: Contains a single preprocessed image tensor of shape [1, 512, 512, 3]
+    """
     # Load a few images from the dataset
     dataset_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'ADE20K')
     image_dir = os.path.join(dataset_path, 'images', 'training')
@@ -79,12 +126,27 @@ def representative_dataset_gen():
 
 def convert_segformer_to_tflite():
     """
-    Convert SegFormer model from KaggleHub to TFLite format.
-    This function:
-    1. Loads the SegFormer model from KaggleHub
-    2. Exports it as a TensorFlow SavedModel
-    3. Converts it to TFLite format with optimizations
-    4. Saves the TFLite model
+    Converts the SegFormer B0 model from Keras format to optimized TFLite format.
+    
+    Key Operations:
+        1. Downloads SegFormer B0 model (ADE20K preset) from Kaggle Hub
+        2. Exports as TensorFlow SavedModel
+        3. Converts to TFLite with following optimizations:
+           - Default optimizations
+           - INT8 quantization
+           - Hardware acceleration support
+           - Float16 support
+           - Custom ops support
+        4. Saves the optimized TFLite model
+    
+    Important Code Blocks:
+        - Model optimization configuration:
+            - Enables multiple optimization sets (TFLITE_BUILTINS, SELECT_TF_OPS)
+            - Configures INT8 quantization with representative dataset
+            - Enables float16 support for better performance
+    
+    Raises:
+        Exception: If model conversion or saving fails
     """
     print("\n🚀 Starting SegFormer B0 conversion process...")
     print("📥 Loading SegFormer B0 model from KaggleHub (ADE20K preset)...")
@@ -145,6 +207,17 @@ def convert_segformer_to_tflite():
         raise
 
 def main():
+    """
+    Main entry point for the model download and conversion process.
+    
+    Key Operations:
+        1. Creates necessary directories
+        2. Downloads all models specified in MODEL_PATHS
+        3. Performs SegFormer conversion
+    
+    The function orchestrates the entire process of downloading and organizing
+    all required models for the segmentation pipeline.
+    """
     print("🚀 Starting model downloads...")
     os.makedirs(MODEL_DIR, exist_ok=True)
 

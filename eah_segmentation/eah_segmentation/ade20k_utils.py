@@ -4,7 +4,19 @@ import numpy as np
 import cv2
 from pathlib import Path
 
-# ADE20K dataset configuration
+"""
+eah_segmentation/ade20k_utils.py
+
+This module provides utilities for working with the ADE20K dataset,
+including dataset loading, preprocessing, and visualization functions.
+
+Key Components:
+- ADE20K dataset configuration (classes, names, sizes)
+- Dataset loading and preprocessing pipeline
+- Visualization utilities for segmentation masks
+"""
+
+# Constants
 ADE20K_CONFIG = {
     'num_classes': 150,
     'input_size': (512, 512),
@@ -35,8 +47,20 @@ ADE20K_CONFIG = {
 
 def load_ade20k_dataset(data_dir, batch_size=1):
     """
-    Load ADE20K dataset from local directory.
-    Returns a dataset of (image, mask) pairs.
+    Loads and preprocesses the ADE20K dataset.
+    
+    Key Operations:
+        1. Loads image and mask pairs
+        2. Resizes to standard input size
+        3. Normalizes image values
+        4. Creates TensorFlow dataset pipeline
+        
+    Args:
+        data_dir (str/Path): Directory containing ADE20K dataset
+        batch_size (int): Batch size for dataset
+        
+    Returns:
+        tf.data.Dataset: Dataset yielding (image, mask) pairs
     """
     print("📥 Loading ADE20K dataset...")
     
@@ -85,8 +109,15 @@ def load_ade20k_dataset(data_dir, batch_size=1):
 
 def get_ade20k_colormap():
     """
-    Returns the ADE20K color mapping for visualization.
-    Each class has a unique RGB color.
+    Generates a deterministic color mapping for ADE20K classes.
+    
+    Features:
+        - Uses fixed random seed for consistency
+        - Maps each class to unique RGB color
+        - Sets background (class 0) to black
+        
+    Returns:
+        np.ndarray: Array of shape (num_classes, 3) containing RGB values
     """
     # Generate a deterministic colormap
     np.random.seed(42)
@@ -97,13 +128,13 @@ def get_ade20k_colormap():
 
 def colorize_ade20k_mask(mask):
     """
-    Convert a segmentation mask to a color image using ADE20K colormap.
+    Converts a segmentation mask to a colored visualization.
     
     Args:
-        mask: Segmentation mask (H, W) with class indices
+        mask (np.ndarray): Segmentation mask of shape (H, W) or (H, W, num_classes)
         
     Returns:
-        Color image (H, W, 3) with RGB values
+        np.ndarray: Colored mask of shape (H, W, 3)
     """
     colormap = get_ade20k_colormap()
     
@@ -120,14 +151,19 @@ def colorize_ade20k_mask(mask):
 
 def save_prediction(image, true_mask, pred_mask, output_dir, index):
     """
-    Save original image, true mask, and predicted mask side by side.
+    Saves a side-by-side visualization of segmentation results.
+    
+    Creates a visualization containing:
+    - Original image
+    - Ground truth segmentation mask
+    - Predicted segmentation mask
     
     Args:
-        image: Original image (H, W, 3)
-        true_mask: Ground truth mask (H, W)
-        pred_mask: Predicted mask (H, W)
-        output_dir: Directory to save results
-        index: Image index for filename
+        image (np.ndarray): Original image (H, W, 3)
+        true_mask (np.ndarray): Ground truth mask (H, W)
+        pred_mask (np.ndarray): Predicted mask (H, W)
+        output_dir (str): Directory to save visualization
+        index (int): Image index for filename
     """
     os.makedirs(output_dir, exist_ok=True)
     

@@ -9,7 +9,14 @@ import time
 
 def preprocess_image(image_bgr, input_size=(512, 512)):
     """
-    Preprocess image for SegFormer model
+    Preprocesses an image for SegFormer model inference.
+    
+    Args:
+        image_bgr (np.ndarray): Input image in BGR format
+        input_size (tuple): Target size for resizing (height, width)
+    
+    Returns:
+        np.ndarray: Preprocessed image in RGB format
     """
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     resized = cv2.resize(image_rgb, input_size)
@@ -17,21 +24,35 @@ def preprocess_image(image_bgr, input_size=(512, 512)):
 
 def map_segformer_to_ade20k(predictions, true_classes=None):
     """
-    Map SegFormer class indices to ADE20K class indices.
-    This is needed because SegFormer uses 0-based indexing while ADE20K uses 1-based indexing.
+    Maps SegFormer class indices to ADE20K class indices.
     
     Args:
-        predictions: SegFormer predictions (H, W) with class indices
-        true_classes: List of ground truth class indices to map to
+        predictions (np.ndarray): Model predictions with class indices
+        true_classes (list, optional): List of ground truth class indices
         
     Returns:
-        Mapped predictions to ADE20K class indices
+        np.ndarray: Predictions mapped to ADE20K class indices
     """
     # Simply add 1 to all predictions to match ADE20K's 1-based indexing
     return predictions + 1
 
 def run_segformer_inference(model, image):
-    """Run inference using SegFormer model."""
+    """
+    Runs inference using SegFormer model (TFLite or Keras).
+    
+    Key Operations:
+        - Handles both TFLite and Keras model formats
+        - Preprocesses input appropriately for each format
+        - Times inference execution
+        - Post-processes predictions to match ADE20K format
+    
+    Args:
+        model: Either tf.lite.Interpreter or keras.Model
+        image (np.ndarray): Preprocessed input image
+        
+    Returns:
+        np.ndarray: Segmentation mask with ADE20K class indices
+    """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
         input_details = model.get_input_details()
@@ -90,7 +111,21 @@ def run_segformer_inference(model, image):
     return predictions_np
 
 def run_deeplab_inference(model, image):
-    """Run inference using DeepLab model."""
+    """
+    Runs inference using DeepLab model.
+    
+    Key Operations:
+        - Handles input quantization for TFLite models
+        - Performs standard DeepLab preprocessing
+        - Provides detailed debugging information
+        
+    Args:
+        model: TF/TFLite model
+        image (np.ndarray): Input image
+        
+    Returns:
+        np.ndarray: Segmentation predictions
+    """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
         input_details = model.get_input_details()
@@ -157,14 +192,13 @@ def run_deeplab_inference(model, image):
 
 def map_mosaic_to_cityscapes(predictions):
     """
-    Map Mosaic class indices to Cityscapes class indices.
-    The model uses Cityscapes classes.
+    Maps Mosaic model predictions to Cityscapes class indices.
     
     Args:
-        predictions: Mosaic predictions (H, W) with class indices
+        predictions (np.ndarray): Raw model predictions
         
     Returns:
-        Mapped predictions to Cityscapes class indices
+        np.ndarray: Predictions mapped to Cityscapes classes
     """
     # Cityscapes classes
     cityscapes_classes = {
@@ -199,14 +233,19 @@ def map_mosaic_to_cityscapes(predictions):
 
 def map_cityscapes_to_ade20k(predictions):
     """
-    Map Cityscapes class indices to ADE20k class indices.
-    Maps semantically similar classes between the two datasets.
+    Maps Cityscapes class indices to ADE20k indices based on semantic similarity.
+    
+    Contains detailed mapping between datasets for classes like:
+    - Road, sidewalk, building
+    - Vehicles (car, truck, bus)
+    - People (person, rider)
+    - Infrastructure (pole, traffic light)
     
     Args:
-        predictions: Predictions with Cityscapes class indices
+        predictions (np.ndarray): Predictions with Cityscapes indices
         
     Returns:
-        Mapped predictions to ADE20k class indices
+        np.ndarray: Predictions mapped to ADE20k indices
     """
     # Cityscapes to ADE20k mapping based on semantic similarity
     cityscapes_to_ade20k = {

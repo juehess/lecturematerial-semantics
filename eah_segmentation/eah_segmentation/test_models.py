@@ -17,14 +17,23 @@ except ImportError:
 
 def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     """
-    Evaluate a model on ADE20K dataset and save visualizations.
+    Evaluates a model on the ADE20K dataset and generates visualizations.
+    
+    Key Operations:
+        - Runs inference on specified number of images
+        - Measures and records inference times
+        - Generates and saves visualizations
+        - Computes timing statistics
     
     Args:
-        model: Loaded model
-        dataset: ADE20K dataset
-        output_dir: Directory to save results
-        num_images: Number of images to evaluate
-        model_name: Name of the model (e.g., 'segformer_b0', 'deeplabv3plus_edgetpu', 'mosaic')
+        model: The model to evaluate (TFLite or Keras)
+        dataset: ADE20K dataset iterator
+        output_dir (str): Directory to save results
+        num_images (int): Number of images to evaluate
+        model_name (str): Name of the model for logging
+        
+    Returns:
+        dict: Dictionary containing timing statistics
     """
     print(f"\n🔍 Evaluating model on {num_images} image{'s' if num_images > 1 else ''}...")
     
@@ -86,7 +95,13 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     }
 
 def save_timing_results(results, output_dir):
-    """Save timing results to a JSON file in the same directory as predictions."""
+    """
+    Saves model evaluation timing results to JSON.
+    
+    Args:
+        results (dict): Dictionary containing timing statistics
+        output_dir (str): Directory to save results
+    """
     # Save results in the same directory as predictions
     output_file = Path(output_dir) / 'timing_results.json'
     
@@ -97,6 +112,23 @@ def save_timing_results(results, output_dir):
     print(f"\n💾 Timing results saved to {output_file}")
 
 def main():
+    """
+    Main entry point for model testing.
+    
+    Key Features:
+        - Command-line interface for test configuration
+        - Support for multiple models and formats
+        - Hardware acceleration selection
+        - Comprehensive result logging
+        
+    Command-line Arguments:
+        --models: List of models to test
+        --model_type: Model format (tflite/keras)
+        --num_images: Number of test images
+        --device: Hardware device (cpu/coral)
+        --output_dir: Results directory
+        --data_dir: Dataset directory
+    """
     parser = argparse.ArgumentParser(description='Test segmentation models on ADE20K dataset')
     parser.add_argument('--models', type=str, nargs='+', required=True,
                       help='List of model names to test')
