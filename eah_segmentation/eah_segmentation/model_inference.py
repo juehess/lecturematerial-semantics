@@ -96,21 +96,54 @@ def run_deeplab_inference(model, image):
         input_details = model.get_input_details()
         output_details = model.get_output_details()
         
-        # Preprocess input with quantization for DeepLab
-        inp = np.expand_dims(image, axis=0).astype(np.float32)
+        # Get expected input size from model
+        input_shape = input_details[0]['shape']
+        expected_height, expected_width = input_shape[1:3]
         
-        # DeepLab TFLite model uses INT8 quantization
-        scale, zp = input_details[0]['quantization']
-        inp = (inp / scale + zp).astype(np.int8)
+        # Resize input to expected dimensions
+        resized_image = cv2.resize(image, (expected_width, expected_height))
+        
+        # Debug original input
+        print(f"📊 Original input range: [{np.min(resized_image)}, {np.max(resized_image)}]")
+        
+        # Standard DeepLab preprocessing:
+        # 1. Convert to float32
+        # 2. Normalize to [-1, 1]
+        img = resized_image.astype(np.float32)
+        img = img * 2.0 - 1.0  # [0,1] -> [-1,1]
+        
+        # Debug normalized range
+        print(f"📊 Normalized range: [{np.min(img)}, {np.max(img)}]")
+        
+        # 3. Apply quantization
+        scale, zero_point = input_details[0]['quantization']
+        img = np.round(img / scale + zero_point)
+        img = np.clip(img, -128, 127).astype(np.int8)
+        
+        # Debug quantized range
+        print(f"📊 Quantized range: [{np.min(img)}, {np.max(img)}]")
+        
+        img = np.expand_dims(img, 0)
         
         # Run inference
-        model.set_tensor(input_details[0]['index'], inp)
+        model.set_tensor(input_details[0]['index'], img)
         model.invoke()
         
-        # Get predictions directly
+        # Get predictions and debug output
         raw_out = model.get_tensor(output_details[0]['index'])
-        predictions = np.argmax(raw_out[0], axis=-1)
-        return predictions.astype(np.int32)
+        print(f"📊 Raw output shape: {raw_out.shape}")
+        print(f"📊 Raw output range: [{np.min(raw_out)}, {np.max(raw_out)}]")
+        
+        predictions = raw_out[0]
+        predictions_np = predictions.astype(np.int32)
+        
+        # Print unique classes in predictions
+        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
+        print("\n📊 Predicted classes:")
+        for cls, count in zip(unique_classes, class_counts):
+            print(f"  Class {cls}: {count} pixels")
+        
+        return predictions_np
     else:
         # Keras model handling
         if len(image.shape) == 3:
