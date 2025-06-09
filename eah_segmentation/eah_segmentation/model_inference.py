@@ -155,48 +155,86 @@ def run_deeplab_inference(model, image):
             preds = preds[0]
         return preds[0].numpy().astype(np.int32)
 
-def map_mosaic_to_ade20k(predictions):
+def map_mosaic_to_cityscapes(predictions):
     """
-    Map Mosaic class indices to ADE20K class indices.
-    The model uses ADE20K's 21-class subset.
+    Map Mosaic class indices to Cityscapes class indices.
+    The model uses Cityscapes classes.
     
     Args:
         predictions: Mosaic predictions (H, W) with class indices
         
     Returns:
-        Mapped predictions to ADE20K class indices
+        Mapped predictions to Cityscapes class indices
     """
-    # ADE20K 21-class subset mapping
-    # Class indices are 1-based in ADE20K
-    ade20k_21class = {
-        0: 0,     # background -> background
-        1: 1,     # wall
-        2: 2,     # building
-        3: 3,     # sky
-        4: 4,     # floor
-        5: 5,     # tree
-        6: 6,     # ceiling
-        7: 7,     # road
-        8: 8,     # bed
-        9: 9,     # windowpane
-        10: 10,   # grass
-        11: 11,   # cabinet
-        12: 12,   # sidewalk
-        13: 13,   # person
-        14: 14,   # earth
-        15: 15,   # door
-        16: 16,   # painting
-        17: 17,   # mountain
-        18: 18,   # plant
-        19: 19,   # curtain
-        20: 20,   # chair
-        21: 21,   # car
+    # Cityscapes classes
+    cityscapes_classes = {
+        0: 0,     # background/unlabeled
+        1: 1,     # road
+        2: 2,     # sidewalk
+        3: 3,     # building
+        4: 4,     # wall
+        5: 5,     # fence
+        6: 6,     # pole
+        7: 7,     # traffic light
+        8: 8,     # traffic sign
+        9: 9,     # vegetation
+        10: 10,   # terrain
+        11: 11,   # sky
+        12: 12,   # person
+        13: 13,   # rider
+        14: 14,   # car
+        15: 15,   # truck
+        16: 16,   # bus
+        17: 17,   # train
+        18: 18,   # motorcycle
     }
     
     # Create a mapping array for efficient lookup
-    mapping_array = np.zeros(max(ade20k_21class.keys()) + 1, dtype=np.int32)
-    for mosaic_idx, ade20k_idx in ade20k_21class.items():
-        mapping_array[mosaic_idx] = ade20k_idx
+    mapping_array = np.zeros(max(cityscapes_classes.keys()) + 1, dtype=np.int32)
+    for idx, mapped_idx in cityscapes_classes.items():
+        mapping_array[idx] = mapped_idx
+    
+    # Map the predictions
+    return mapping_array[predictions]
+
+def map_cityscapes_to_ade20k(predictions):
+    """
+    Map Cityscapes class indices to ADE20k class indices.
+    Maps semantically similar classes between the two datasets.
+    
+    Args:
+        predictions: Predictions with Cityscapes class indices
+        
+    Returns:
+        Mapped predictions to ADE20k class indices
+    """
+    # Cityscapes to ADE20k mapping based on semantic similarity
+    cityscapes_to_ade20k = {
+        0: 0,    # unlabeled -> background
+        1: 7,    # road -> road
+        2: 12,   # sidewalk -> sidewalk
+        3: 2,    # building -> building
+        4: 1,    # wall -> wall
+        5: 33,   # fence -> fence
+        6: 94,   # pole -> pole
+        7: 137,  # traffic light -> traffic light
+        8: 44,   # traffic sign -> signboard
+        9: 5,    # vegetation -> tree
+        10: 14,  # terrain -> earth
+        11: 3,   # sky -> sky
+        12: 13,  # person -> person
+        13: 13,  # rider -> person (both are people)
+        14: 21,  # car -> car
+        15: 84,  # truck -> truck
+        16: 81,  # bus -> bus
+        17: 91,  # train -> airplane (closest vehicle class)
+        18: 117, # motorcycle -> minibike
+    }
+    
+    # Create a mapping array for efficient lookup
+    mapping_array = np.zeros(max(cityscapes_to_ade20k.keys()) + 1, dtype=np.int32)
+    for cityscapes_idx, ade20k_idx in cityscapes_to_ade20k.items():
+        mapping_array[cityscapes_idx] = ade20k_idx
     
     # Map the predictions
     return mapping_array[predictions]
@@ -235,25 +273,23 @@ def run_mosaic_inference(model, image):
         expected_height, expected_width = input_shape[1:3]
         print(f"\n📊 Expected input size: {expected_width}x{expected_height}")
         
-        # Resize input to expected dimensions
-        resized_image = cv2.resize(image, (expected_width, expected_height))
-        print(f"📊 Resized image shape: {resized_image.shape}")
+        # Keep original size for now
+        print(f"📊 Using input shape: {image.shape}")
         
         # Convert to UINT8 (0-255 range) as required by the model
-        inp = np.expand_dims(resized_image, axis=0)
+        inp = np.expand_dims(image, axis=0)
         inp = (inp * 255).astype(np.uint8)
         
-        # Apply quantization if needed
-        if 'quantization' in input_details[0]:
-            scale, zero_point = input_details[0]['quantization']
-            if scale != 0:  # Only apply if quantization is active
-                inp = np.round(inp / scale + zero_point).astype(np.uint8)
+        # Now resize to model's expected size
+        inp_resized = np.zeros((1, expected_height, expected_width, 3), dtype=np.uint8)
+        inp_resized[0] = cv2.resize(inp[0], (expected_width, expected_height), 
+                                  interpolation=cv2.INTER_LINEAR)
         
-        print(f"📊 Input tensor shape: {inp.shape}")
-        print(f"📊 Input tensor range: [{np.min(inp)}, {np.max(inp)}]")
+        print(f"📊 Input tensor shape: {inp_resized.shape}")
+        print(f"📊 Input tensor range: [{np.min(inp_resized)}, {np.max(inp_resized)}]")
         
         # Run inference
-        model.set_tensor(input_details[0]['index'], inp)
+        model.set_tensor(input_details[0]['index'], inp_resized)
         model.invoke()
         
         # Get predictions directly
@@ -272,22 +308,22 @@ def run_mosaic_inference(model, image):
         print(f"📊 Predictions shape: {predictions_np.shape}")
         print(f"📊 Predictions range: [{np.min(predictions_np)}, {np.max(predictions_np)}]")
         
-        # Print unique classes in predictions
+        # Print unique classes in predictions (raw Cityscapes classes)
         unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-        print("\n📊 Predicted classes before mapping:")
+        print("\n📊 Predicted Cityscapes classes:")
         for cls, count in zip(unique_classes, class_counts):
             print(f"  Class {cls}: {count} pixels")
         
-        # Map predictions to ADE20K class indices
-        predictions_np = map_mosaic_to_ade20k(predictions_np)
+        # Map Cityscapes predictions to ADE20k classes
+        predictions_np = map_cityscapes_to_ade20k(predictions_np)
         
-        # Print unique classes after mapping
+        # Print unique classes after mapping to ADE20k
         unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-        print("\n📊 Predicted classes after mapping:")
+        print("\n📊 Predicted ADE20k classes:")
         for cls, count in zip(unique_classes, class_counts):
             print(f"  Class {cls}: {count} pixels")
         
-        # Resize back to original image size
+        # Resize back to original image size using nearest neighbor to preserve class indices
         if predictions_np.shape != image.shape[:2]:
             predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
                                       interpolation=cv2.INTER_NEAREST)
@@ -350,8 +386,8 @@ def run_mosaic_inference(model, image):
         # Get class predictions
         preds_np = np.argmax(logits[0].numpy(), axis=-1)
         
-        # Map predictions to ADE20K class indices
-        preds_np = map_mosaic_to_ade20k(preds_np)
+        # Map Cityscapes predictions to ADE20k classes
+        preds_np = map_cityscapes_to_ade20k(preds_np)
         
         return preds_np.astype(np.int32)
 
