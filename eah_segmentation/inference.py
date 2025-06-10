@@ -7,19 +7,19 @@ from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmenta
 import os
 import time
 
-def map_segformer_to_ade20k(predictions, true_classes=None):
-    """
-    Maps SegFormer class indices to ADE20K class indices.
-    
-    Args:
-        predictions (np.ndarray): Model predictions with class indices
-        true_classes (list, optional): List of ground truth class indices
-        
-    Returns:
-        np.ndarray: Predictions mapped to ADE20K class indices
-    """
-    # Simply add 1 to all predictions to match ADE20K's 1-based indexing
-    return predictions + 1
+# Try relative import first, then fall back to absolute import
+try:
+    from .class_mapping import (
+        map_segformer_to_ade20k,
+        map_mosaic_to_cityscapes,
+        map_cityscapes_to_ade20k
+    )
+except ImportError:
+    from class_mapping import (
+        map_segformer_to_ade20k,
+        map_mosaic_to_cityscapes,
+        map_cityscapes_to_ade20k
+    )
 
 def run_segformer_inference(model, image):
     """
@@ -175,245 +175,86 @@ def run_deeplab_inference(model, image):
             preds = preds[0]
         return preds[0].numpy().astype(np.int32)
 
-def map_mosaic_to_cityscapes(predictions):
-    """
-    Maps Mosaic model predictions to Cityscapes class indices.
-    
-    Args:
-        predictions (np.ndarray): Raw model predictions
-        
-    Returns:
-        np.ndarray: Predictions mapped to Cityscapes classes
-    """
-    # Cityscapes classes
-    cityscapes_classes = {
-        0: 0,     # background/unlabeled
-        1: 1,     # road
-        2: 2,     # sidewalk
-        3: 3,     # building
-        4: 4,     # wall
-        5: 5,     # fence
-        6: 6,     # pole
-        7: 7,     # traffic light
-        8: 8,     # traffic sign
-        9: 9,     # vegetation
-        10: 10,   # terrain
-        11: 11,   # sky
-        12: 12,   # person
-        13: 13,   # rider
-        14: 14,   # car
-        15: 15,   # truck
-        16: 16,   # bus
-        17: 17,   # train
-        18: 18,   # motorcycle
-    }
-    
-    # Create a mapping array for efficient lookup
-    mapping_array = np.zeros(max(cityscapes_classes.keys()) + 1, dtype=np.int32)
-    for idx, mapped_idx in cityscapes_classes.items():
-        mapping_array[idx] = mapped_idx
-    
-    # Map the predictions
-    return mapping_array[predictions]
-
-def map_cityscapes_to_ade20k(predictions):
-    """
-    Maps Cityscapes class indices to ADE20k indices based on semantic similarity.
-    
-    Contains detailed mapping between datasets for classes like:
-    - Road, sidewalk, building
-    - Vehicles (car, truck, bus)
-    - People (person, rider)
-    - Infrastructure (pole, traffic light)
-    
-    Args:
-        predictions (np.ndarray): Predictions with Cityscapes indices
-        
-    Returns:
-        np.ndarray: Predictions mapped to ADE20k indices
-    """
-    # Cityscapes to ADE20k mapping based on semantic similarity
-    cityscapes_to_ade20k = {
-        0: 0,    # unlabeled -> background
-        1: 7,    # road -> road
-        2: 12,   # sidewalk -> sidewalk
-        3: 2,    # building -> building
-        4: 1,    # wall -> wall
-        5: 33,   # fence -> fence
-        6: 94,   # pole -> pole
-        7: 137,  # traffic light -> traffic light
-        8: 44,   # traffic sign -> signboard
-        9: 5,    # vegetation -> tree
-        10: 14,  # terrain -> earth
-        11: 3,   # sky -> sky
-        12: 13,  # person -> person
-        13: 13,  # rider -> person (both are people)
-        14: 21,  # car -> car
-        15: 84,  # truck -> truck
-        16: 81,  # bus -> bus
-        17: 91,  # train -> airplane (closest vehicle class)
-        18: 117, # motorcycle -> minibike
-    }
-    
-    # Create a mapping array for efficient lookup
-    mapping_array = np.zeros(max(cityscapes_to_ade20k.keys()) + 1, dtype=np.int32)
-    for cityscapes_idx, ade20k_idx in cityscapes_to_ade20k.items():
-        mapping_array[cityscapes_idx] = ade20k_idx
-    
-    # Map the predictions
-    return mapping_array[predictions]
-
 def run_mosaic_inference(model, image):
-    """Run inference using Mosaic model."""
-    if isinstance(model, tf.lite.Interpreter):
-        # TFLite model handling
-        input_details = model.get_input_details()
-        output_details = model.get_output_details()
+    """
+    Runs inference using Mosaic model (TFLite only).
+    
+    Key Operations:
+        - Handles TFLite model format
+        - Maps predictions to Cityscapes classes
+        - Maps Cityscapes classes to ADE20K format
         
-        # Print detailed model information
-        print("\n📋 TFLite Model Details:")
-        print("\nInput Details:")
-        for i, detail in enumerate(input_details):
-            print(f"  Input {i}:")
-            print(f"    Name: {detail['name']}")
-            print(f"    Shape: {detail['shape']}")
-            print(f"    Type: {detail['dtype']}")
-            if 'quantization' in detail:
-                scale, zero_point = detail['quantization']
-                print(f"    Quantization: scale={scale}, zero_point={zero_point}")
+    Args:
+        model (tf.lite.Interpreter): TFLite model interpreter
+        image (np.ndarray): Input image in range [0, 1]
         
-        print("\nOutput Details:")
-        for i, detail in enumerate(output_details):
-            print(f"  Output {i}:")
-            print(f"    Name: {detail['name']}")
-            print(f"    Shape: {detail['shape']}")
-            print(f"    Type: {detail['dtype']}")
-            if 'quantization' in detail:
-                scale, zero_point = detail['quantization']
-                print(f"    Quantization: scale={scale}, zero_point={zero_point}")
+    Returns:
+        np.ndarray: Segmentation predictions in ADE20K format
+    """
+    if not isinstance(model, tf.lite.Interpreter):
+        raise ValueError("Mosaic model must be a TFLite model")
         
-        # Get expected input size from model
-        input_shape = input_details[0]['shape']
-        expected_height, expected_width = input_shape[1:3]
-        print(f"\n📊 Expected input size: {expected_width}x{expected_height}")
-        
-        # Keep original size for now
-        print(f"📊 Using input shape: {image.shape}")
-        
-        # Convert to UINT8 (0-255 range) as required by the model
-        inp = np.expand_dims(image, axis=0)
-        inp = (inp * 255).astype(np.uint8)
-        
-        # Now resize to model's expected size
-        inp_resized = np.zeros((1, expected_height, expected_width, 3), dtype=np.uint8)
-        inp_resized[0] = cv2.resize(inp[0], (expected_width, expected_height), 
-                                  interpolation=cv2.INTER_LINEAR)
-        
-        print(f"📊 Input tensor shape: {inp_resized.shape}")
-        print(f"📊 Input tensor range: [{np.min(inp_resized)}, {np.max(inp_resized)}]")
-        
-        # Run inference
-        model.set_tensor(input_details[0]['index'], inp_resized)
-        model.invoke()
-        
-        # Get predictions directly
-        raw_out = model.get_tensor(output_details[0]['index'])
-        print(f"\n📊 Raw output shape: {raw_out.shape}")
-        print(f"📊 Raw output range: [{np.min(raw_out)}, {np.max(raw_out)}]")
-        
-        # Dequantize output if needed
-        if 'quantization' in output_details[0]:
-            scale, zero_point = output_details[0]['quantization']
-            if scale != 0:  # Only apply if quantization is active
-                raw_out = (raw_out.astype(np.float32) - zero_point) * scale
-        
-        predictions = np.argmax(raw_out[0], axis=-1)
-        predictions_np = predictions.astype(np.int32)
-        print(f"📊 Predictions shape: {predictions_np.shape}")
-        print(f"📊 Predictions range: [{np.min(predictions_np)}, {np.max(predictions_np)}]")
-        
-        # Print unique classes in predictions (raw Cityscapes classes)
-        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-        print("\n📊 Predicted Cityscapes classes:")
-        for cls, count in zip(unique_classes, class_counts):
-            print(f"  Class {cls}: {count} pixels")
-        
-        # Map Cityscapes predictions to ADE20k classes
-        predictions_np = map_cityscapes_to_ade20k(predictions_np)
-        
-        # Print unique classes after mapping to ADE20k
-        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-        print("\n📊 Predicted ADE20k classes:")
-        for cls, count in zip(unique_classes, class_counts):
-            print(f"  Class {cls}: {count} pixels")
-        
-        # Resize back to original image size using nearest neighbor to preserve class indices
-        if predictions_np.shape != image.shape[:2]:
-            predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
-                                      interpolation=cv2.INTER_NEAREST)
-        
-        return predictions_np
-    else:
-        # TensorFlow model handling
-        if len(image.shape) == 3:
-            inp = tf.expand_dims(image, 0)
-        else:
-            inp = image
-        
-        # Convert to UINT8 (0-255 range) as required by the model
-        inp = (inp * 255).astype(np.uint8)
-        
-        # Print available signatures
-        print("\n📋 Available model signatures:")
-        for signature_name, signature in model.signatures.items():
-            print(f"  - {signature_name}")
-            print(f"    Inputs: {signature.inputs}")
-            print(f"    Outputs: {signature.outputs}")
-        
-        # Try different signatures
-        try:
-            # First try serving_default
-            outputs = model.signatures['serving_default'](inp)
-            print("\n✅ Using 'serving_default' signature")
-        except Exception as e:
-            print(f"\n❌ Error with 'serving_default': {str(e)}")
-            try:
-                # Try predict
-                outputs = model.signatures['predict'](inp)
-                print("\n✅ Using 'predict' signature")
-            except Exception as e:
-                print(f"\n❌ Error with 'predict': {str(e)}")
-                try:
-                    # Try inference
-                    outputs = model.signatures['inference'](inp)
-                    print("\n✅ Using 'inference' signature")
-                except Exception as e:
-                    print(f"\n❌ Error with 'inference': {str(e)}")
-                    raise ValueError("No working signature found")
-        
-        # Get predictions from the output tensor
-        # Try different output names
-        output_names = ['output_0', 'logits', 'predictions', 'output']
-        logits = None
-        for name in output_names:
-            if name in outputs:
-                logits = outputs[name]
-                print(f"\n✅ Using output tensor: {name}")
-                break
-        
-        if logits is None:
-            print("\n❌ No known output tensor found. Available outputs:")
-            for name, tensor in outputs.items():
-                print(f"  - {name}: {tensor.shape}")
-            raise ValueError("No known output tensor found")
-        
-        # Get class predictions
-        preds_np = np.argmax(logits[0].numpy(), axis=-1)
-        
-        # Map Cityscapes predictions to ADE20k classes
-        preds_np = map_cityscapes_to_ade20k(preds_np)
-        
-        return preds_np.astype(np.int32)
+    # TFLite model handling
+    input_details = model.get_input_details()
+    output_details = model.get_output_details()
+    
+    # Get expected input size from model
+    input_shape = input_details[0]['shape']
+    expected_height, expected_width = input_shape[1:3]
+    
+    # Convert input from float32 [0,1] to uint8 [0,255]
+    inp = np.expand_dims(image, axis=0)
+    inp = (inp * 255).astype(np.uint8)
+    
+    # Resize to model's expected size
+    inp_resized = np.zeros(input_shape, dtype=np.uint8)
+    inp_resized[0] = cv2.resize(inp[0], (expected_width, expected_height), 
+                              interpolation=cv2.INTER_LINEAR)
+    
+    print(f"📊 Input tensor shape: {inp_resized.shape}")
+    print(f"📊 Input tensor range: [{np.min(inp_resized)}, {np.max(inp_resized)}]")
+    
+    # Run inference
+    model.set_tensor(input_details[0]['index'], inp_resized)
+    model.invoke()
+    
+    # Get predictions directly
+    raw_out = model.get_tensor(output_details[0]['index'])
+    print(f"\n📊 Raw output shape: {raw_out.shape}")
+    print(f"📊 Raw output range: [{np.min(raw_out)}, {np.max(raw_out)}]")
+    
+    # Dequantize output if needed
+    if 'quantization' in output_details[0]:
+        scale, zero_point = output_details[0]['quantization']
+        if scale != 0:  # Only apply if quantization is active
+            raw_out = (raw_out.astype(np.float32) - zero_point) * scale
+    
+    predictions = np.argmax(raw_out[0], axis=-1)
+    predictions_np = predictions.astype(np.int32)
+    print(f"📊 Predictions shape: {predictions_np.shape}")
+    print(f"📊 Predictions range: [{np.min(predictions_np)}, {np.max(predictions_np)}]")
+    
+    # Print unique classes in predictions (raw Cityscapes classes)
+    unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
+    print("\n📊 Predicted Cityscapes classes:")
+    for cls, count in zip(unique_classes, class_counts):
+        print(f"  Class {cls}: {count} pixels")
+    
+    # Map Cityscapes predictions to ADE20k classes
+    predictions_np = map_cityscapes_to_ade20k(predictions_np)
+    
+    # Print unique classes after mapping to ADE20k
+    unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
+    print("\n📊 Predicted ADE20k classes:")
+    for cls, count in zip(unique_classes, class_counts):
+        print(f"  Class {cls}: {count} pixels")
+    
+    # Resize back to original image size using nearest neighbor to preserve class indices
+    if predictions_np.shape != image.shape[:2]:
+        predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
+                                  interpolation=cv2.INTER_NEAREST)
+    
+    return predictions_np
 
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
     """

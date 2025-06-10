@@ -1,3 +1,5 @@
+"""Model evaluation utilities."""
+
 import os
 import tensorflow as tf
 import numpy as np
@@ -14,6 +16,68 @@ try:
 except ImportError:
     from ade20k_utils import load_ade20k_dataset, save_prediction
     from inference import run_inference_on_image
+
+def load_model(model_name, model_type='keras', device='cpu'):
+    """
+    Load a model for evaluation.
+    
+    Args:
+        model_name (str): Name of the model to load
+        model_type (str): Type of model ('tflite' or 'keras')
+        device (str): Device to run on ('cpu' or 'coral')
+        
+    Returns:
+        tuple: (model, load_time)
+            - model: The loaded model (TFLite interpreter or Keras model)
+            - load_time: Time taken to load the model in seconds
+    """
+    print(f"\n🚀 Loading {model_name} ({model_type}) for {device}...")
+    
+    # Find model directory
+    model_dir = Path(__file__).parent.parent / 'models' / model_name
+    if not model_dir.exists():
+        raise ValueError(f"Model directory not found: {model_dir}")
+    
+    # Measure model loading time
+    load_start_time = time.perf_counter()
+    
+    if model_type == 'tflite':
+        # Load TFLite model
+        tflite_path = model_dir / 'tflite' / '1.tflite'
+        if not tflite_path.exists():
+            raise ValueError(f"TFLite model not found: {tflite_path}")
+            
+        print(f"📥 Loading TFLite model from {tflite_path}")
+        if device == 'coral':
+            try:
+                interpreter = tf.lite.Interpreter(
+                    model_path=str(tflite_path),
+                    experimental_delegates=[tf.lite.load_delegate('libedgetpu.so.1')]
+                )
+                print("✅ Successfully loaded model on Coral TPU")
+            except Exception as e:
+                print(f"❌ Failed to load model on Coral TPU: {str(e)}")
+                print("⚠️ Falling back to CPU")
+                interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+        else:
+            interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+        interpreter.allocate_tensors()
+        model = interpreter
+    else:
+        # Load Keras/SavedModel
+        keras_path = model_dir / 'keras'
+        if not keras_path.exists():
+            raise ValueError(f"Keras model not found: {keras_path}")
+            
+        print(f"📥 Loading Keras model from {keras_path}")
+        model = tf.saved_model.load(str(keras_path))
+        if model is None:
+            raise ValueError(f"Failed to load model: {model_name}")
+    
+    load_time = time.perf_counter() - load_start_time
+    print(f"⏱️  Model loading time: {load_time:.3f} seconds")
+    
+    return model, load_time
 
 def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     """
@@ -162,75 +226,35 @@ def main():
     
     # Test each model
     for model_name in args.models:
-        print(f"\n🚀 Testing {model_name} ({args.model_type}) on {args.device}...")
-        
         # Create model-specific output directory
         model_output_dir = output_dir / f"{model_name}_{args.model_type}_{args.device}"
         model_output_dir.mkdir(exist_ok=True)
         
-        # Load model
-        model_dir = Path(__file__).parent.parent / 'models' / model_name
-        if not model_dir.exists():
-            print(f"❌ Model directory not found: {model_dir}")
-            continue
-            
         try:
-            # Measure model loading time
-            load_start_time = time.perf_counter()
+            # Load model
+            model, load_time = load_model(model_name, args.model_type, args.device)
             
-            if args.model_type == 'tflite':
-                # Load TFLite model
-                tflite_path = model_dir / 'tflite' / '1.tflite'
-                if tflite_path.exists():
-                    print(f"📥 Loading TFLite model from {tflite_path}")
-                    if args.device == 'coral':
-                        try:
-                            interpreter = tf.lite.Interpreter(
-                                model_path=str(tflite_path),
-                                experimental_delegates=[tf.lite.load_delegate('libedgetpu.so.1')]
-                            )
-                            print("✅ Successfully loaded model on Coral TPU")
-                        except Exception as e:
-                            print(f"❌ Failed to load model on Coral TPU: {str(e)}")
-                            print("⚠️ Falling back to CPU")
-                            interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
-                    else:
-                        interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
-                    interpreter.allocate_tensors()
-                    model = interpreter
-                else:
-                    print(f"❌ TFLite model not found: {tflite_path}")
-                    continue
-            else:
-                # Load Keras model
-                keras_path = model_dir / 'keras'
-                if keras_path.exists():
-                    print(f"📥 Loading Keras model from {keras_path}")
-                    model = tf.saved_model.load(str(keras_path))
-                else:
-                    print(f"❌ Keras model not found: {keras_path}")
-                    continue
+            # Evaluate model
+            results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
             
-            load_end_time = time.perf_counter()
-            load_time = load_end_time - load_start_time
-            print(f"⏱️  Model loading time: {load_time:.3f} seconds")
+            # Add model loading time to results
+            results['load_time'] = load_time
+            all_results.append(results)
             
-            # Evaluate model and get timing results
-            timing_results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
-            timing_results['load_time'] = load_time
-            timing_results['device'] = args.device
-            all_results.append(timing_results)
-            
-            # Save timing results for this model
-            save_timing_results([timing_results], model_output_dir)
+            # Save individual model results
+            save_timing_results(results, model_output_dir)
             
         except Exception as e:
             print(f"❌ Error testing {model_name}: {str(e)}")
             continue
     
-    # Save combined timing results for all models
+    # Save combined results
     if all_results:
-        save_timing_results(all_results, output_dir)
+        combined_results = {
+            'timestamp': datetime.now().isoformat(),
+            'models': all_results
+        }
+        save_timing_results(combined_results, output_dir)
 
 if __name__ == '__main__':
     main() 
