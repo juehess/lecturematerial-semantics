@@ -11,6 +11,7 @@ dependencies:
   - numpy>=1.23.0
   - opencv>=4.7.0
   - pillow>=9.5.0
+  - matplotlib>=3.7.0
   - jupyterlab
   - pip:
       # Core dependencies
@@ -23,7 +24,8 @@ dependencies:
       
       # Model-specific dependencies
       - keras-cv>=0.5.10
-      - git+https://github.com/bonlime/keras-deeplab-v3-plus.git
+      - keras-hub>=0.20.0
+      #- git+https://github.com/bonlime/keras-deeplab-v3-plus.git
       
       # Utility packages
       - tqdm>=4.65.0
