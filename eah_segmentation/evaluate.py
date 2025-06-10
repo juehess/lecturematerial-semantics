@@ -1,159 +1,40 @@
-"""Model evaluation utilities."""
+"""Command-line interface for model evaluation."""
 
 import os
-import tensorflow as tf
-import numpy as np
 from pathlib import Path
 import argparse
-import time
-import json
 from datetime import datetime
 
-# Try relative imports first, fall back to absolute imports
 try:
-    from ade20k_utils import load_ade20k_dataset, save_prediction
-    from inference import run_inference_on_image
+    from ade20k_utils import load_ade20k_dataset
     from utils import load_model, save_timing_results
     from metrics import evaluate_model
+    from model_config import MODEL_NAMES
 except ImportError:
-    from eah_segmentation.ade20k_utils import load_ade20k_dataset, save_prediction
-    from eah_segmentation.inference import run_inference_on_image
+    from eah_segmentation.ade20k_utils import load_ade20k_dataset
     from eah_segmentation.utils import load_model, save_timing_results
     from eah_segmentation.metrics import evaluate_model
-
-def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
-    """
-    Evaluates a model on the ADE20K dataset and generates visualizations.
-    
-    Key Operations:
-        - Runs inference on specified number of images
-        - Measures and records inference times
-        - Generates and saves visualizations
-        - Computes timing statistics
-    
-    Args:
-        model: The model to evaluate (TFLite or Keras)
-        dataset: ADE20K dataset iterator
-        output_dir (str): Directory to save results
-        num_images (int): Number of images to evaluate
-        model_name (str): Name of the model for logging
-        
-    Returns:
-        dict: Dictionary containing timing statistics
-    """
-    print(f"\n🔍 Evaluating model on {num_images} image{'s' if num_images > 1 else ''}...")
-    
-    # Initialize timing statistics
-    inference_times = []
-    
-    for i, (image, true_mask) in enumerate(dataset):
-        if i >= num_images:
-            break
-            
-        # Run inference
-        print(f"📸 Processing image {i+1}...")
-        
-        # Get ground truth classes
-        true_classes = np.unique(true_mask.numpy()[0])
-        print("\n📊 Ground truth classes:")
-        for cls in true_classes:
-            print(f"  Class {cls}")
-        
-        # Measure inference time
-        start_time = time.perf_counter()
-        pred_mask = run_inference_on_image(model, image.numpy()[0], model_name, true_classes)
-        end_time = time.perf_counter()
-        inference_time = end_time - start_time
-        inference_times.append(inference_time)
-        
-        print(f"⏱️  Inference time: {inference_time:.3f} seconds")
-        
-        # Save visualization
-        save_prediction(
-            image.numpy()[0],
-            true_mask.numpy()[0],
-            pred_mask,
-            output_dir,
-            i
-        )
-        
-        print(f"✅ Processed image {i+1}/{num_images}")
-    
-    # Calculate and print timing statistics
-    avg_time = np.mean(inference_times)
-    std_time = np.std(inference_times)
-    min_time = np.min(inference_times)
-    max_time = np.max(inference_times)
-    
-    print(f"\n📊 Timing Statistics for {model_name}:")
-    print(f"  Average inference time: {avg_time:.3f} ± {std_time:.3f} seconds")
-    print(f"  Min inference time: {min_time:.3f} seconds")
-    print(f"  Max inference time: {max_time:.3f} seconds")
-    
-    return {
-        'model_name': model_name,
-        'num_images': num_images,
-        'avg_time': avg_time,
-        'std_time': std_time,
-        'min_time': min_time,
-        'max_time': max_time,
-        'all_times': inference_times
-    }
-
-def save_timing_results(results, output_dir):
-    """
-    Saves model evaluation timing results to JSON.
-    
-    Args:
-        results (dict): Dictionary containing timing statistics
-        output_dir (str): Directory to save results
-    """
-    # Save results in the same directory as predictions
-    output_file = Path(output_dir) / 'timing_results.json'
-    
-    # Save results
-    with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"\n💾 Timing results saved to {output_file}")
+    from eah_segmentation.model_config import MODEL_NAMES
 
 def main():
-    """
-    Main entry point for model testing.
-    
-    Key Features:
-        - Command-line interface for test configuration
-        - Support for multiple models and formats
-        - Hardware acceleration selection
-        - Comprehensive result logging
-        
-    Command-line Arguments:
-        --models: List of models to test
-        --model_type: Model format (tflite/keras)
-        --num_images: Number of test images
-        --device: Hardware device (cpu/coral)
-        --output_dir: Results directory
-        --data_dir: Dataset directory
-    """
-    parser = argparse.ArgumentParser(description='Test segmentation models on ADE20K dataset')
-    parser.add_argument('--models', type=str, nargs='+', required=True,
-                      help='List of model names to test')
-    parser.add_argument('--model_type', type=str, choices=['tflite', 'keras'], default='keras',
+    parser = argparse.ArgumentParser(description='Evaluate semantic segmentation models.')
+    parser.add_argument('--models', nargs='+', required=True,
+                      help='Model names to evaluate')
+    parser.add_argument('--model_type', choices=['keras', 'tflite'], default='keras',
                       help='Type of model to use (tflite or keras)')
-    parser.add_argument('--num_images', type=int, default=1,
-                      help='Number of images to test on (default: 1)')
-    parser.add_argument('--output_dir', type=str, default='results',
-                      help='Directory to save results')
     parser.add_argument('--data_dir', type=str, default='datasets',
                       help='Directory containing ADE20K dataset')
+    parser.add_argument('--num_images', type=int, default=1,
+                      help='Number of images to test on (default: 1)')
     parser.add_argument('--image_index', type=int, default=0,
                       help='Index of the image to test (default: 0)')
     parser.add_argument('--device', type=str, choices=['cpu', 'coral'], default='cpu',
                       help='Device to run inference on (cpu or coral)')
+    
     args = parser.parse_args()
     
     # Create output directory
-    output_dir = Path(args.output_dir)
+    output_dir = Path('results')
     output_dir.mkdir(exist_ok=True)
     
     # Load ADE20K dataset

@@ -5,6 +5,13 @@ import time
 import json
 from pathlib import Path
 import tensorflow as tf
+import numpy as np
+from datetime import datetime
+
+try:
+    from model_config import MODEL_NAMES
+except ImportError:
+    from eah_segmentation.model_config import MODEL_NAMES
 
 def load_model(model_name, model_type='keras', device='cpu'):
     """
@@ -21,6 +28,9 @@ def load_model(model_name, model_type='keras', device='cpu'):
             - load_time: Time taken to load the model in seconds
     """
     print(f"\n🚀 Loading {model_name} ({model_type}) for {device}...")
+    
+    # Map model name if it exists in mapping
+    model_name = MODEL_NAMES.get(model_name, model_name)
     
     # Find model directory
     model_dir = Path(__file__).parent.parent / 'models' / model_name
@@ -66,7 +76,37 @@ def load_model(model_name, model_type='keras', device='cpu'):
     load_time = time.perf_counter() - load_start_time
     print(f"⏱️  Model loading time: {load_time:.3f} seconds")
     
-    return model, load_time 
+    return model, load_time
+
+def save_timing_results(results, output_dir):
+    """Save timing results to a JSON file."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_file = output_dir / f"timing_results_{timestamp}.json"
+    
+    with open(output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+
+def save_timing_results(model_name, inference_times, output_dir):
+    """Save model inference timing results to a JSON file."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    results = {
+        'model_name': model_name,
+        'mean_time': float(np.mean(inference_times)),
+        'std_time': float(np.std(inference_times)),
+        'min_time': float(np.min(inference_times)),
+        'max_time': float(np.max(inference_times)),
+        'num_runs': len(inference_times),
+        'all_times': [float(t) for t in inference_times]
+    }
+    
+    output_file = output_dir / f"{model_name}_timing.json"
+    with open(output_file, 'w') as f:
+        json.dump(results, f, indent=2)
 
 def save_timing_results(results, output_dir):
     """

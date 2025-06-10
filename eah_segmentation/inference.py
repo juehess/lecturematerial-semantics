@@ -13,12 +13,14 @@ try:
         map_mosaic_to_cityscapes,
         map_cityscapes_to_ade20k
     )
+    from model_config import MODEL_NAMES
 except ImportError:
     from eah_segmentation.class_mapping import (
         map_segformer_to_ade20k,
         map_mosaic_to_cityscapes,
         map_cityscapes_to_ade20k
     )
+    from eah_segmentation.model_config import MODEL_NAMES
 
 def run_segformer_inference(model, image):
     """
@@ -256,78 +258,20 @@ def run_mosaic_inference(model, image):
     return predictions_np
 
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
-    """
-    Run inference on a single image using different model types.
-    
-    Args:
-        model: Model to use for inference (SegFormer, DeepLab, or Mosaic)
-        image: Input image array (H, W, 3) in range [0..1]
-        model_name: Name of the model (e.g., 'segformer_b0', 'deeplabv3plus_edgetpu', 'mosaic')
-        true_classes: List of ground truth class indices to map to
-        ground_truth: Ground truth segmentation mask for comparison
-        
-    Returns:
-        A 2D NumPy array of shape (H, W) with class indices.
-    """
-    if hasattr(image, 'numpy'):
-        image = image.numpy()
-    
+    """Run inference on a single image using the specified model."""
     print(f"\n📊 Input image shape: {image.shape}")
     print(f"📊 Input image range: [{np.min(image)}, {np.max(image)}]")
     
-    # Run inference based on model architecture
-    if model_name == 'segformer_b0':
-        predictions_np = run_segformer_inference(model, image)
-    elif model_name == 'deeplabv3plus_edgetpu':
-        predictions_np = run_deeplab_inference(model, image)
-    elif model_name == 'mosaic':
-        predictions_np = run_mosaic_inference(model, image)
+    # Map model name if provided
+    if model_name is not None:
+        model_name = MODEL_NAMES.get(model_name, model_name)
+    
+    # Run model-specific inference
+    if 'segformer' in model_name:
+        return run_segformer_inference(model, image)
+    elif 'deeplabv3' in model_name:
+        return run_deeplab_inference(model, image)
+    elif 'mosaic' in model_name:
+        return run_mosaic_inference(model, image)
     else:
         raise ValueError(f"Unknown model type: {model_name}")
-    
-    print(f"📊 Raw predictions shape: {predictions_np.shape}, dtype: {predictions_np.dtype}")
-    print(f"📊 Raw predictions range: [{np.min(predictions_np)}, {np.max(predictions_np)}]")
-    
-    # Print unique classes and their frequencies
-    unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-    print("\n📊 Predicted classes:")
-    for cls, count in zip(unique_classes, class_counts):
-        print(f"  Class {cls}: {count} pixels")
-    
-    # Handle ground truth comparison if available
-    if ground_truth is not None:
-        print("\n📊 Ground truth classes:")
-        gt_unique_classes, gt_class_counts = np.unique(ground_truth, return_counts=True)
-        for cls, count in zip(gt_unique_classes, gt_class_counts):
-            print(f"  Class {cls}: {count} pixels")
-        
-        # Print class-wise comparison
-        print("\n📊 Class-wise comparison (predicted vs ground truth):")
-        for cls in set(unique_classes) | set(gt_unique_classes):
-            pred_count = np.sum(predictions_np == cls)
-            gt_count = np.sum(ground_truth == cls)
-            print(f"  Class {cls}: {pred_count} predicted vs {gt_count} ground truth")
-        
-        # Map predictions to ground truth classes if needed
-        if not np.all(np.isin(unique_classes, gt_unique_classes)):
-            print("\n🔄 Mapping predictions to ground truth classes...")
-            # Create a mapping array
-            mapping = np.zeros(np.max(unique_classes) + 1, dtype=np.int32)
-            # Map each predicted class to the closest ground truth class
-            for pred_cls in unique_classes:
-                if pred_cls in gt_unique_classes:
-                    mapping[pred_cls] = pred_cls
-                else:
-                    # Find the closest ground truth class
-                    closest_gt = min(gt_unique_classes, key=lambda x: abs(x - pred_cls))
-                    mapping[pred_cls] = closest_gt
-            # Apply the mapping
-            predictions_np = mapping[predictions_np]
-    
-    # Resize predictions to match input image size if needed
-    if predictions_np.shape != image.shape[:2]:
-        predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
-                                  interpolation=cv2.INTER_NEAREST)
-    
-    print(f"Returning predictions of shape: {predictions_np.shape}")
-    return predictions_np
