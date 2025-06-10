@@ -59,13 +59,13 @@ def main():
             
             # Evaluate model
             results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
-            
-            # Add model loading time to results
             results['load_time'] = load_time
-            all_results.append(results)
             
             # Save individual model results
             save_timing_results(results, model_output_dir)
+            
+            # Add to combined results
+            all_results.append(results)
             
         except Exception as e:
             print(f"❌ Error testing {model_name}: {str(e)}")

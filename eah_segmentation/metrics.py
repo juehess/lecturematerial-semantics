@@ -49,11 +49,8 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
         for cls in true_classes:
             print(f"  Class {cls}")
         
-        # Measure inference time
-        start_time = time.perf_counter()
-        pred_mask = run_inference_on_image(model, image.numpy()[0], model_name, true_classes)
-        end_time = time.perf_counter()
-        inference_time = end_time - start_time
+        # Run inference and measure time
+        pred_mask, inference_time = run_inference_on_image(model, image.numpy()[0], model_name, true_classes)
         inference_times.append(inference_time)
         
         print(f"⏱️  Inference time: {inference_time:.3f} seconds")

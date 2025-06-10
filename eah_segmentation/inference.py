@@ -37,7 +37,9 @@ def run_segformer_inference(model, image):
         image (np.ndarray): Preprocessed input image
         
     Returns:
-        np.ndarray: Segmentation mask with ADE20K class indices
+        tuple: (predictions, inference_time)
+            - predictions (np.ndarray): Segmentation mask with ADE20K class indices
+            - inference_time (float): Time taken for inference in seconds
     """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
@@ -94,7 +96,7 @@ def run_segformer_inference(model, image):
         predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
                                   interpolation=cv2.INTER_NEAREST)
     
-    return predictions_np
+    return predictions_np, inference_time
 
 def run_deeplab_inference(model, image):
     """
@@ -110,7 +112,9 @@ def run_deeplab_inference(model, image):
         image (np.ndarray): Input image
         
     Returns:
-        np.ndarray: Segmentation predictions
+        tuple: (predictions, inference_time)
+            - predictions (np.ndarray): Segmentation predictions
+            - inference_time (float): Time taken for inference in seconds
     """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
@@ -146,9 +150,12 @@ def run_deeplab_inference(model, image):
         
         img = np.expand_dims(img, 0)
         
-        # Run inference
+        # Run inference with timing
         model.set_tensor(input_details[0]['index'], img)
+        start_time = time.perf_counter()
         model.invoke()
+        inference_time = time.perf_counter() - start_time
+        print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
         
         # Get predictions and debug output
         raw_out = model.get_tensor(output_details[0]['index'])
@@ -164,17 +171,23 @@ def run_deeplab_inference(model, image):
         for cls, count in zip(unique_classes, class_counts):
             print(f"  Class {cls}: {count} pixels")
         
-        return predictions_np
+        return predictions_np, inference_time
     else:
         # Keras model handling
         if len(image.shape) == 3:
             inp = tf.expand_dims(image, 0)
         else:
             inp = image
+            
+        # Run inference with timing
+        start_time = time.perf_counter()
         preds = model(inp, training=False)
+        inference_time = time.perf_counter() - start_time
+        print(f"⏱️ Keras inference time: {inference_time*1000:.2f}ms")
+        
         if isinstance(preds, tuple):
             preds = preds[0]
-        return preds[0].numpy().astype(np.int32)
+        return preds[0].numpy().astype(np.int32), inference_time
 
 def run_mosaic_inference(model, image):
     """
@@ -190,7 +203,9 @@ def run_mosaic_inference(model, image):
         image (np.ndarray): Input image in range [0, 1]
         
     Returns:
-        np.ndarray: Segmentation predictions in ADE20K format
+        tuple: (predictions, inference_time)
+            - predictions (np.ndarray): Segmentation predictions in ADE20K format
+            - inference_time (float): Time taken for inference in seconds
     """
     if not isinstance(model, tf.lite.Interpreter):
         raise ValueError("Mosaic model must be a TFLite model")
@@ -215,9 +230,12 @@ def run_mosaic_inference(model, image):
     print(f"📊 Input tensor shape: {inp_resized.shape}")
     print(f"📊 Input tensor range: [{np.min(inp_resized)}, {np.max(inp_resized)}]")
     
-    # Run inference
+    # Run inference with timing
     model.set_tensor(input_details[0]['index'], inp_resized)
+    start_time = time.perf_counter()
     model.invoke()
+    inference_time = time.perf_counter() - start_time
+    print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
     
     # Get predictions directly
     raw_out = model.get_tensor(output_details[0]['index'])
@@ -255,7 +273,7 @@ def run_mosaic_inference(model, image):
         predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
                                   interpolation=cv2.INTER_NEAREST)
     
-    return predictions_np
+    return predictions_np, inference_time
 
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
     """Run inference on a single image using the specified model."""
@@ -268,10 +286,12 @@ def run_inference_on_image(model, image, model_name=None, true_classes=None, gro
     
     # Run model-specific inference
     if 'segformer' in model_name:
-        return run_segformer_inference(model, image)
+        predictions, inference_time = run_segformer_inference(model, image)
     elif 'deeplabv3' in model_name:
-        return run_deeplab_inference(model, image)
+        predictions, inference_time = run_deeplab_inference(model, image)
     elif 'mosaic' in model_name:
-        return run_mosaic_inference(model, image)
+        predictions, inference_time = run_mosaic_inference(model, image)
     else:
         raise ValueError(f"Unknown model type: {model_name}")
+        
+    return predictions, inference_time

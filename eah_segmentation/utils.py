@@ -79,47 +79,36 @@ def load_model(model_name, model_type='keras', device='cpu'):
     return model, load_time
 
 def save_timing_results(results, output_dir):
-    """Save timing results to a JSON file."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(exist_ok=True)
+    """
+    Save timing results to a JSON file.
     
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = output_dir / f"timing_results_{timestamp}.json"
-    
-    with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-
-def save_timing_results(model_name, inference_times, output_dir):
-    """Save model inference timing results to a JSON file."""
+    Args:
+        results: Either a single model's results dict or a combined results dict
+        output_dir: Directory to save results
+    """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    results = {
-        'model_name': model_name,
-        'mean_time': float(np.mean(inference_times)),
-        'std_time': float(np.std(inference_times)),
-        'min_time': float(np.min(inference_times)),
-        'max_time': float(np.max(inference_times)),
-        'num_runs': len(inference_times),
-        'all_times': [float(t) for t in inference_times]
-    }
+    # Handle single model results
+    if isinstance(results, dict) and 'inference_times' in results:
+        inference_times = results['inference_times']
+        model_name = results.get('model_name', 'unknown_model')
+        
+        results = {
+            'model_name': model_name,
+            'mean_time': float(np.mean(inference_times)),
+            'std_time': float(np.std(inference_times)),
+            'min_time': float(np.min(inference_times)),
+            'max_time': float(np.max(inference_times)),
+            'num_runs': len(inference_times),
+            'all_times': [float(t) for t in inference_times],
+            'load_time': results.get('load_time', None)
+        }
+        output_file = output_dir / f"{model_name}_timing.json"
+    else:
+        # Handle combined results
+        output_file = output_dir / f"timing_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     
-    output_file = output_dir / f"{model_name}_timing.json"
-    with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-
-def save_timing_results(results, output_dir):
-    """
-    Saves model evaluation timing results to JSON.
-    
-    Args:
-        results (dict): Dictionary containing timing statistics
-        output_dir (str): Directory to save results
-    """
-    # Save results in the same directory as predictions
-    output_file = Path(output_dir) / 'timing_results.json'
-    
-    # Save results
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
     
