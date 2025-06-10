@@ -43,8 +43,8 @@ dev = [
 "Homepage" = "https://github.com/juehess/eah_segmentation"
 
 [project.scripts]
-# Exposes a command "eah-seg-run" -> calls main() in run_segmentation_models.py
-eah-seg-run = "eah_segmentation.run_segmentation_models:main"
+# Exposes a command "eah-seg-run" -> calls main() in run_segmentation.py
+eah-seg-run = "eah_segmentation.run_segmentation:main"
 
 [tool.setuptools]
 packages = ["eah_segmentation"]

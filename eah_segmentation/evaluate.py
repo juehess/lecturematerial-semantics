@@ -10,10 +10,10 @@ from datetime import datetime
 # Try relative imports first, fall back to absolute imports
 try:
     from .ade20k_utils import load_ade20k_dataset, save_prediction
-    from .model_inference import run_inference_on_image
+    from .inference import run_inference_on_image
 except ImportError:
     from ade20k_utils import load_ade20k_dataset, save_prediction
-    from model_inference import run_inference_on_image
+    from inference import run_inference_on_image
 
 def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     """

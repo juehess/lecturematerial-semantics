@@ -11,11 +11,11 @@ import argparse
 
 # Change relative imports to absolute imports
 try:
-    from .color_utils import colorize_mask
-    from .model_inference import run_inference_on_image
+    from .visualization import colorize_mask
+    from .inference import run_inference_on_image
 except ImportError:
-    from color_utils import colorize_mask
-    from model_inference import run_inference_on_image
+    from visualization import colorize_mask
+    from inference import run_inference_on_image
 
 # Get the directory of the script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

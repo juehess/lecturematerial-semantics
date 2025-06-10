@@ -273,7 +273,7 @@ def main():
     if success:
         print("\n🎉 Dataset download completed successfully!")
         print("\nYou can now run the test script:")
-        print("python -m eah_segmentation.test_models --models deeplabv3plus_edgetpu segformer_b0")
+        print("python -m eah_segmentation.evaluate --models deeplabv3plus_edgetpu segformer_b0")
     else:
         print("\n❌ Dataset download failed. Please check the error message above.")
 

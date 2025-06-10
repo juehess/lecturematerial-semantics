@@ -120,14 +120,14 @@ The notebooks can run inference on a Raspberry Pi with Coral EdgeTPU via SSH. To
 To test the models on the ADE20K dataset:
 
 ```bash
-# Test all models
-python -m eah_segmentation.test_models --models segformer_b0 deeplabv3plus_edgetpu mosaic --num_images 5
+# Run evaluation on multiple models
+python -m eah_segmentation.evaluate --models segformer_b0 deeplabv3plus_edgetpu mosaic --num_images 5
 
-# Test specific model
-python -m eah_segmentation.test_models --models segformer_b0 --num_images 1
+# Run evaluation on a single model
+python -m eah_segmentation.evaluate --models segformer_b0 --num_images 1
 
-# Test with TFLite models
-python -m eah_segmentation.test_models --models segformer_b0 deeplabv3plus_edgetpu mosaic --model_type tflite --num_images 5
+# Run evaluation using TFLite models
+python -m eah_segmentation.evaluate --models segformer_b0 deeplabv3plus_edgetpu mosaic --model_type tflite --num_images 5
 ```
 
 ### Command Line Arguments
