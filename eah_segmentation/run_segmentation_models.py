@@ -34,53 +34,11 @@ MODELS = {
         'input_size': (512, 512),
         'preprocess': 'mobilenet'
     },
-    'deeplabv3plus_xception': {
-        'input_size': (512, 512),
-        'preprocess': 'xception'
-    },
     'segformer_b0': {
         'input_size': (512, 512),
         'preprocess': 'normalize'
-    }
+    },
 }
-
-def preprocess_image(image_path, target_size, preprocess_type='normalize'):
-    """
-    Preprocesses an image for model input based on model-specific requirements.
-    
-    Args:
-        image_path (str): Path to input image
-        target_size (tuple): Desired output size (height, width)
-        preprocess_type (str): Type of preprocessing ('normalize', 'xception', 'mobilenet')
-        
-    Returns:
-        np.ndarray: Preprocessed image ready for model input
-    """
-    # Read image
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Could not read image at {image_path}")
-    
-    # Convert BGR to RGB
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    # Resize image
-    img = cv2.resize(img, (target_size[1], target_size[0]))  # width, height
-    
-    # Apply model-specific preprocessing
-    if preprocess_type == 'normalize':  # for SegFormer
-        # Simple normalization to [0, 1]
-        img = img.astype(np.float32) / 255.0
-    elif preprocess_type in ('xception', 'mobilenet'):  # for DeepLab
-        # Normalize to [-1, 1]
-        img = img.astype(np.float32) / 127.5 - 1.0
-    else:
-        raise ValueError(f"Unknown preprocessing type: {preprocess_type}")
-    
-    # Add batch dimension
-    img = np.expand_dims(img, axis=0)
-    
-    return img
 
 def load_model_from_path(model_name, model_dir):
     """
@@ -211,103 +169,3 @@ def run_inference_on_image(model, image, model_name, preprocess_type='normalize'
     except Exception as e:
         print(f"Error during inference: {str(e)}")
         return None
-
-def main():
-    parser = argparse.ArgumentParser(description='Run segmentation models on an image')
-    parser.add_argument('--input', type=str, required=True, help='Path to input image')
-    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save results')
-    parser.add_argument('--models', type=str, nargs='+', default=list(MODELS.keys()),
-                      help='List of models to run (default: all models)')
-    args = parser.parse_args()
-
-    # Convert input path to absolute path
-    input_path = os.path.abspath(args.input)
-    if not os.path.exists(input_path):
-        print(f"Error: Input file {input_path} does not exist")
-        return
-
-    # Create output directory if it doesn't exist
-    output_dir = os.path.join(PROJECT_ROOT, args.output_dir)
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Load and resize original image once
-    original = cv2.imread(input_path)
-    if original is None:
-        print(f"Error: Could not read input image {input_path}")
-        return
-
-    # Process with each model
-    for model_name in args.models:
-        if model_name not in MODELS:
-            print(f"Warning: Unknown model {model_name}, skipping...")
-            continue
-
-        print(f"\nProcessing with {model_name}...")
-        model_info = MODELS[model_name]
-        input_size = model_info['input_size']
-        preprocess_type = model_info['preprocess']
-
-        # Load and preprocess image
-        try:
-            image = preprocess_image(input_path, input_size, preprocess_type)
-            print(f"Successfully loaded and preprocessed image with shape: {image.shape}")
-            print(f"Preprocessed image min/max: {np.min(image)}/{np.max(image)}")
-        except Exception as e:
-            print(f"Error loading image: {str(e)}")
-            continue
-
-        # Load model
-        model_dir = os.path.join(PROJECT_ROOT, 'models')
-        try:
-            model = load_model_from_path(model_name, model_dir)
-            if model is None:
-                print(f"Error loading model: {model_name}")
-                continue
-            print(f"Successfully loaded model")
-        except Exception as e:
-            print(f"Error loading model {model_name}: {str(e)}")
-            continue
-
-        try:
-            predictions = run_inference_on_image(model, image, model_name, preprocess_type)
-            if predictions is not None:
-                print(f"Prediction shape: {predictions.shape}")
-                
-                # Save raw predictions
-                output_path = os.path.join(output_dir, f"{model_name}_prediction.npy")
-                np.save(output_path, predictions)
-                print(f"Saved raw predictions to {output_path}")
-                
-                # Save colorized mask
-                color_mask = colorize_mask(predictions)
-                print(f"Color mask shape: {color_mask.shape}")
-                mask_path = os.path.join(output_dir, f"{model_name}_mask.png")
-                cv2.imwrite(mask_path, cv2.cvtColor(color_mask, cv2.COLOR_RGB2BGR))
-                print(f"Saved colorized mask to {mask_path}")
-                
-                # Create overlay
-                # Resize original image to match mask size
-                resized_original = cv2.resize(original, (input_size[1], input_size[0]))
-                print(f"Resized original shape: {resized_original.shape}")
-                
-                # Ensure both images have the same dimensions
-                if resized_original.shape[:2] != color_mask.shape[:2]:
-                    print("Resizing color mask to match original image dimensions")
-                    color_mask = cv2.resize(color_mask, (resized_original.shape[1], resized_original.shape[0]))
-                
-                # Convert color mask to BGR for overlay
-                color_mask_bgr = cv2.cvtColor(color_mask, cv2.COLOR_RGB2BGR)
-                print(f"Color mask BGR shape: {color_mask_bgr.shape}")
-                
-                # Create overlay
-                overlay = cv2.addWeighted(resized_original, 0.7, color_mask_bgr, 0.3, 0)
-                overlay_path = os.path.join(output_dir, f"{model_name}_overlay.png")
-                cv2.imwrite(overlay_path, overlay)
-                print(f"Saved overlay to {overlay_path}")
-        except Exception as e:
-            print(f"Error processing {model_name}: {str(e)}")
-            import traceback
-            traceback.print_exc()
-
-if __name__ == "__main__":
-    main()

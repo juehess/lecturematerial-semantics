@@ -7,21 +7,6 @@ from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmenta
 import os
 import time
 
-def preprocess_image(image_bgr, input_size=(512, 512)):
-    """
-    Preprocesses an image for SegFormer model inference.
-    
-    Args:
-        image_bgr (np.ndarray): Input image in BGR format
-        input_size (tuple): Target size for resizing (height, width)
-    
-    Returns:
-        np.ndarray: Preprocessed image in RGB format
-    """
-    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    resized = cv2.resize(image_rgb, input_size)
-    return resized
-
 def map_segformer_to_ade20k(predictions, true_classes=None):
     """
     Maps SegFormer class indices to ADE20K class indices.
@@ -506,68 +491,3 @@ def run_inference_on_image(model, image, model_name=None, true_classes=None, gro
     
     print(f"Returning predictions of shape: {predictions_np.shape}")
     return predictions_np
-
-def load_segformer_model(model_path=None, use_tflite=False):
-    """
-    Load SegFormer model from local path.
-    
-    Args:
-        model_path: Optional path to a local model. If None, uses default local path.
-        use_tflite: Whether to load the TFLite version of the model.
-        
-    Returns:
-        Loaded SegFormer model
-    """
-    if model_path is None:
-        if use_tflite:
-            model_path = "models/segformer_b0/tflite/model.tflite"
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(
-                    f"TFLite model not found at {model_path}. "
-                    "Please run download_models.py first to download and convert the model."
-                )
-            # Load TFLite model with optimizations
-            interpreter = tf.lite.Interpreter(model_path=model_path)
-            
-            # Try to enable hardware acceleration
-            try:
-                # Try to use GPU delegate
-                gpu_delegate = tf.lite.experimental.load_delegate('libedgetpu.so.1')
-                interpreter = tf.lite.Interpreter(
-                    model_path=model_path,
-                    experimental_delegates=[gpu_delegate]
-                )
-                print("✅ Using GPU acceleration")
-            except:
-                try:
-                    # Try to use XNNPACK delegate for CPU optimization
-                    interpreter = tf.lite.Interpreter(
-                        model_path=model_path,
-                        experimental_delegates=[tf.lite.experimental.load_delegate('libxnnpack_delegate.so')]
-                    )
-                    print("✅ Using XNNPACK CPU optimization")
-                except:
-                    print("⚠️ Using default CPU execution")
-            
-            # Set number of threads for CPU execution
-            interpreter.set_num_threads(4)
-            
-            interpreter.allocate_tensors()
-            return interpreter
-        else:
-            model_path = "models/segformer_b0/keras"
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(
-                    f"Keras model not found at {model_path}. "
-                    "Please run download_models.py first to download and convert the model."
-                )
-            # Load Keras model
-            return tf.saved_model.load(model_path)
-    else:
-        if use_tflite:
-            interpreter = tf.lite.Interpreter(model_path=model_path)
-            interpreter.set_num_threads(4)
-            interpreter.allocate_tensors()
-            return interpreter
-        else:
-            return tf.saved_model.load(model_path)
