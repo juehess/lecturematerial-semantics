@@ -7,15 +7,14 @@ from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmenta
 import os
 import time
 
-# Try relative import first, then fall back to absolute import
 try:
-    from .class_mapping import (
+    from class_mapping import (
         map_segformer_to_ade20k,
         map_mosaic_to_cityscapes,
         map_cityscapes_to_ade20k
     )
 except ImportError:
-    from class_mapping import (
+    from eah_segmentation.class_mapping import (
         map_segformer_to_ade20k,
         map_mosaic_to_cityscapes,
         map_cityscapes_to_ade20k
