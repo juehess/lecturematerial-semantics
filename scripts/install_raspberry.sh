@@ -21,9 +21,6 @@ print_section "Updating system packages"
 sudo apt-get update
 sudo apt-get upgrade -y
 sudo apt-get install -y \
-    python3.9 \
-    python3.9-dev \
-    python3.9-venv \
     python3-pip \
     git \
     wget \
@@ -47,9 +44,6 @@ sudo apt-get install -y \
     python3-dev \
     gnupg
 
-# Set Python 3.9 as the default python3
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
-
 # Install Miniconda
 print_section "Installing Miniconda"
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O ~/miniconda.sh
@@ -64,9 +58,11 @@ echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sud
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 sudo apt-get update
 
-# Install Edge TPU runtime and PyCoral
+# Install Edge TPU runtime
 sudo apt-get install -y libedgetpu1-std
-sudo apt-get install -y python3-pycoral=2.0.0
+
+# Install PyCoral using pip
+python3 -m pip install --extra-index-url https://google-coral.github.io/py-repo/ pycoral~=2.0
 
 # Create udev rules for Coral USB
 print_section "Setting up udev rules for Coral USB"
@@ -110,4 +106,8 @@ echo "   source ~/.bashrc"
 echo "2. Activate the environment:"
 echo "   conda activate eah_segmentation"
 echo -e "\n⚠️  Note: You may need to reboot your Raspberry Pi for all changes to take effect."
-echo "After reboot, verify the installation by running the test notebook in notebooks/segmentation_example.ipynb" 
+echo "After reboot, verify the installation by running the test notebook in notebooks/segmentation_example.ipynb"
+
+echo "Installation complete! Please reboot your system."
+echo "After reboot, create the conda environment using:"
+echo "conda env create -f environment_raspberry.yml" 

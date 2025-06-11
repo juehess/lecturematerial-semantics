@@ -17,8 +17,10 @@ dependencies:
   
   # Hardware-specific dependencies for Raspberry Pi
   - pip:
-      # TensorFlow Lite (specific version for pycoral compatibility)
-      - tflite-runtime==2.5.0.post1
+      # TensorFlow Lite and Coral
+      - --extra-index-url https://google-coral.github.io/py-repo/
+      - pycoral~=2.0
+      - tflite-runtime~=2.5.0
       
       # OpenCV (headless version for better performance)
       - opencv-python-headless>=4.8.0
