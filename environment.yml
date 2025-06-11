@@ -13,6 +13,7 @@ dependencies:
   - pillow>=9.5.0
   - matplotlib>=3.7.0
   - jupyterlab
+  - ipywidgets>=8.0.0
   - pip:
       # Core dependencies
       - tensorflow>=2.12.0

@@ -3,6 +3,7 @@
 import time
 import numpy as np
 from pathlib import Path
+import cv2
 
 try:
     from inference import run_inference_on_image
@@ -86,3 +87,78 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
         'max_time': max_time,
         'all_times': inference_times
     } 
+
+def evaluate_single_image(model, image, true_mask=None, model_name=None):
+    """
+    Evaluates a model on a single image and returns the results.
+    
+    Args:
+        model: The model to evaluate (TFLite or Keras)
+        image: Input image as numpy array in [0,1] range
+        true_mask: Optional ground truth mask
+        model_name: Name of the model for logging
+        
+    Returns:
+        dict: Dictionary containing:
+            - image: Original input image
+            - pred_mask: Predicted segmentation mask
+            - true_mask: Ground truth mask (if provided)
+            - inference_time: Time taken for inference
+            - true_classes: Ground truth classes (if true_mask provided)
+    """
+    results = {}
+    results['image'] = image
+    
+    # Get ground truth classes if mask provided
+    if true_mask is not None:
+        true_classes = np.unique(true_mask)
+        results['true_mask'] = true_mask
+        results['true_classes'] = true_classes
+        print("\n📊 Ground truth classes:")
+        for cls in true_classes:
+            print(f"  Class {cls}")
+    else:
+        true_classes = None
+        
+    # Run inference and measure time
+    pred_mask, inference_time = run_inference_on_image(model, image, model_name, true_classes)
+    
+    results['pred_mask'] = pred_mask
+    results['inference_time'] = inference_time
+    
+    print(f"⏱️  Inference time: {inference_time:.3f} seconds")
+    
+    return results
+
+def run_inference_on_arbitrary_image(model, image_path, model_name=None, target_size=(512, 512)):
+    """
+    Runs inference on any arbitrary image file.
+    
+    Args:
+        model: The model to evaluate (TFLite or Keras)
+        image_path: Path to the image file
+        model_name: Name of the model for logging
+        target_size: Tuple of (height, width) for resizing
+        
+    Returns:
+        dict: Dictionary containing:
+            - image: Original input image
+            - pred_mask: Predicted segmentation mask
+            - inference_time: Time taken for inference
+    """
+    # Load and preprocess image
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"Could not read image at {image_path}")
+    
+    # Convert BGR to RGB
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # Resize image
+    img = cv2.resize(img, target_size)
+    
+    # Normalize to [0, 1]
+    img = img.astype(np.float32) / 255.0
+    
+    # Run inference
+    return evaluate_single_image(model, img, model_name=model_name) 
