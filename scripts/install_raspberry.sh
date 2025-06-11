@@ -45,7 +45,9 @@ print_section "Installing Coral USB dependencies"
 echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 sudo apt-get update
-sudo apt-get install -y libedgetpu1-std
+
+# Install Edge TPU runtime and PyCoral
+sudo apt-get install -y libedgetpu1-std python3-pycoral
 # Note: Use max frequency version only if you have good cooling
 # sudo apt-get install -y libedgetpu1-max
 
@@ -112,6 +114,14 @@ conda env remove -n $ENV_NAME -y || true
 
 # Create new environment from environment_raspberry.yml
 conda env create -f environment_raspberry.yml
+
+# Print Coral installation status
+print_section "Verifying Coral installation"
+echo "Edge TPU runtime and PyCoral have been installed."
+echo "⚠️  Important: After installation completes:"
+echo "1. Reboot your Raspberry Pi"
+echo "2. Unplug and replug your Coral USB accelerator"
+echo "3. The LED on the Coral device should light up"
 
 echo -e "\n✅ Installation completed!"
 echo -e "\n📋 Next steps:"
