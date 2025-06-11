@@ -3,37 +3,41 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  # System-level dependencies
+  # Core Python and basic dependencies
   - python=3.9
   - pip
   - numpy>=1.23.0
   - pillow>=9.5.0
   - matplotlib>=3.7.0
-  - jupyterlab
+  
+  # Jupyter environment
+  - jupyterlab>=4.0.0
   - ipywidgets>=8.0.0
   - jupyterlab-widgets>=1.0.0
+  - notebook>=7.0.0
   
   # Hardware-specific dependencies for Raspberry Pi
   - pip:
-      # TensorFlow Lite and Edge TPU support
+      # TensorFlow Lite and Coral
       - tflite-runtime>=2.14.0
       - pycoral>=2.0.0
       
-      # OpenCV (built with optimizations)
+      # OpenCV (headless version for better performance)
       - opencv-python-headless>=4.8.0
       
       # Core ML framework - using TF nightly for better ARM support
-      - tf-nightly-arm64
-      - tensorflow-hub>=0.14.0
-      - tensorflow-io-gcs-filesystem>=0.31.0
-      
-      # Model-specific dependencies
-      - keras>=3.0.0
-      - transformers>=4.30.0
+      - tensorflow-aarch64>=2.14.0
       
       # Utility packages
       - tqdm>=4.65.0
       - psutil>=5.9.0  # For monitoring system resources
+      
+      # Web server for remote access
+      - jupyter-server-proxy>=4.1.0  # For proxying Jupyter through nginx if needed
+      
+      # Model dependencies
+      - transformers>=4.30.0  # For SegFormer
+      - keras>=3.0.0
   - kagglehub>=0.2.0
   
   # Model-specific dependencies

@@ -40,6 +40,23 @@ sudo apt-get install -y \
     wget \
     git
 
+# Install Coral USB dependencies
+print_section "Installing Coral USB dependencies"
+echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install -y libedgetpu1-std
+# Note: Use max frequency version only if you have good cooling
+# sudo apt-get install -y libedgetpu1-max
+
+# Add current user to plugdev group for Coral USB access
+sudo usermod -aG plugdev $USER
+
+# Create udev rules for Coral USB
+print_section "Setting up Coral USB rules"
+echo 'SUBSYSTEM=="usb",ATTRS{idVendor}=="1a6e",ATTRS{idProduct}=="089a",MODE="0666",GROUP="plugdev"' | sudo tee /etc/udev/rules.d/99-coral-edgetpu.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
 # Optional: Disable GUI-related services to save resources
 print_section "Optimizing system for headless operation"
 if systemctl is-active --quiet lightdm; then
