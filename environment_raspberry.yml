@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   # Core Python and basic dependencies
-  - python=3.9
+  - python=3.9  # Required by pycoral
   - pip
   - numpy>=1.23.0
   - pillow>=9.5.0
@@ -17,8 +17,8 @@ dependencies:
   
   # Hardware-specific dependencies for Raspberry Pi
   - pip:
-      # TensorFlow Lite
-      - tflite-runtime>=2.14.0
+      # TensorFlow Lite (specific version for pycoral compatibility)
+      - tflite-runtime==2.5.0.post1
       
       # OpenCV (headless version for better performance)
       - opencv-python-headless>=4.8.0
