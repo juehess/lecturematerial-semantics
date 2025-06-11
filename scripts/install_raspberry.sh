@@ -27,33 +27,32 @@ sudo apt-get install -y \
     build-essential \
     cmake \
     pkg-config \
-    libjpeg-dev \
-    libtiff-dev \
-    libavcodec-dev \
-    libavformat-dev \
-    libswscale-dev \
-    libv4l-dev \
-    libxvidcore-dev \
-    libx264-dev \
-    libatlas-base-dev \
     python3-dev \
     python3-pip \
     python3-venv \
-    libhdf5-dev \
-    libhdf5-serial-dev \
-    libjasper-dev \
-    libqt4-test \
-    libfontconfig1-dev \
-    libcairo2-dev \
-    libgdk-pixbuf2.0-dev \
-    libpango1.0-dev \
-    libgtk2.0-dev \
-    libgtk-3-dev \
-    libfreetype6-dev \
-    libpng-dev \
     python3-numpy \
+    libatlas-base-dev \
+    libhdf5-dev \
+    libopenjp2-7-dev \
+    libtbb-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
     wget \
     git
+
+# Optional: Disable GUI-related services to save resources
+print_section "Optimizing system for headless operation"
+if systemctl is-active --quiet lightdm; then
+    echo "Disabling desktop environment (lightdm) on boot..."
+    sudo systemctl disable lightdm
+fi
+
+# Increase swap size for better ML performance
+print_section "Configuring system for ML workloads"
+SWAP_SIZE="2G"
+echo "Setting swap size to $SWAP_SIZE..."
+sudo sed -i "s/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/" /etc/dphys-swapfile
+sudo /etc/init.d/dphys-swapfile restart
 
 # Install miniforge if not already installed
 print_section "Setting up miniforge"
