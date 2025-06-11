@@ -49,18 +49,18 @@ def load_model(model_name, model_type='keras', device='cpu'):
         print(f"📥 Loading TFLite model from {tflite_path}")
         if device == 'coral':
             try:
-                interpreter = tf.lite.Interpreter(
-                    model_path=str(tflite_path),
-                    experimental_delegates=[tf.lite.load_delegate('libedgetpu.so.1')]
-                )
+                from pycoral.utils.edgetpu import make_interpreter
+                interpreter = make_interpreter(str(tflite_path))
+                interpreter.allocate_tensors()
                 print("✅ Successfully loaded model on Coral TPU")
             except Exception as e:
                 print(f"❌ Failed to load model on Coral TPU: {str(e)}")
                 print("⚠️ Falling back to CPU")
                 interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+                interpreter.allocate_tensors()
         else:
             interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
-        interpreter.allocate_tensors()
+            interpreter.allocate_tensors()
         model = interpreter
     else:
         # Load Keras/SavedModel

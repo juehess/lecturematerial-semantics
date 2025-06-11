@@ -27,6 +27,7 @@ dependencies:
       
       # Core ML framework - using TF nightly for better ARM support
       - tensorflow-aarch64>=2.14.0
+      - tf-keras  # Required for transformers compatibility
       
       # Utility packages
       - tqdm>=4.65.0
@@ -38,6 +39,8 @@ dependencies:
       # Model dependencies
       - transformers>=4.30.0  # For SegFormer
       - keras>=3.0.0
+      - keras-cv>=0.5.10
+      - keras-hub>=0.20.0
   - kagglehub>=0.2.0
   
   # Model-specific dependencies
