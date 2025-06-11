@@ -61,10 +61,25 @@ if ! command -v conda &> /dev/null; then
     echo "Installing miniforge..."
     wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh -O miniforge.sh
     chmod +x miniforge.sh
-    ./miniforge.sh -b
+    ./miniforge.sh -b -p $HOME/miniforge3
     rm miniforge.sh
-    ~/miniforge3/bin/conda init
-    source ~/.bashrc
+    
+    # Initialize conda in the current shell
+    export PATH="$HOME/miniforge3/bin:$PATH"
+    
+    # Initialize conda in .bashrc
+    $HOME/miniforge3/bin/conda init bash
+    
+    # Also initialize for zsh if it exists
+    if [ -f "$HOME/.zshrc" ]; then
+        $HOME/miniforge3/bin/conda init zsh
+    fi
+    
+    # Ensure conda is available in current session
+    eval "$($HOME/miniforge3/bin/conda shell.bash hook)"
+    
+    echo "Conda has been installed and initialized"
+    echo "Please run 'source ~/.bashrc' after the script finishes"
 else
     echo "Miniforge already installed"
 fi
@@ -73,6 +88,9 @@ fi
 print_section "Creating conda environment"
 ENV_NAME="eah_segmentation"
 
+# Ensure we're using conda from miniforge
+export PATH="$HOME/miniforge3/bin:$PATH"
+
 # Remove existing environment if it exists
 conda env remove -n $ENV_NAME -y || true
 
@@ -80,7 +98,10 @@ conda env remove -n $ENV_NAME -y || true
 conda env create -f environment_raspberry.yml
 
 echo -e "\n✅ Installation completed!"
-echo "To activate the environment, run:"
+echo -e "\n📋 Next steps:"
+echo "1. Reload your shell configuration:"
+echo "   source ~/.bashrc"
+echo "2. Activate the environment:"
 echo "   conda activate $ENV_NAME"
 echo -e "\n⚠️  Note: You may need to reboot your Raspberry Pi for all changes to take effect."
 echo "After reboot, verify the installation by running the test notebook in notebooks/segmentation_example.ipynb" 
