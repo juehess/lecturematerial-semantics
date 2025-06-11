@@ -151,27 +151,34 @@ def run_deeplab_inference(model, image):
         img = np.expand_dims(img, 0)
         
         # Run inference with timing
-        model.set_tensor(input_details[0]['index'], img)
         start_time = time.perf_counter()
+        model.set_tensor(input_details[0]['index'], img)
         model.invoke()
+        output = model.get_tensor(output_details[0]['index'])
         inference_time = time.perf_counter() - start_time
+        
         print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
         
-        # Get predictions and debug output
-        raw_out = model.get_tensor(output_details[0]['index'])
-        print(f"📊 Raw output shape: {raw_out.shape}")
-        print(f"📊 Raw output range: [{np.min(raw_out)}, {np.max(raw_out)}]")
+        # Process output
+        print(f"📊 Raw output shape: {output.shape}")
+        print(f"📊 Raw output range: [{np.min(output)}, {np.max(output)}]")
         
-        predictions = raw_out[0]
-        predictions_np = predictions.astype(np.int32)
+        # Dequantize output if needed
+        if 'quantization' in output_details[0]:
+            scale, zero_point = output_details[0]['quantization']
+            if scale != 0:  # Only apply if quantization is active
+                output = (output.astype(np.float32) - zero_point) * scale
         
-        # Print unique classes in predictions
-        unique_classes, class_counts = np.unique(predictions_np, return_counts=True)
-        print("\n📊 Predicted classes:")
-        for cls, count in zip(unique_classes, class_counts):
-            print(f"  Class {cls}: {count} pixels")
+        # Get predictions
+        predictions = np.argmax(output[0], axis=-1)
         
-        return predictions_np, inference_time
+        # Resize predictions back to original size if needed
+        if predictions.shape != image.shape[:2]:
+            predictions = cv2.resize(predictions.astype(np.float32), 
+                                  (image.shape[1], image.shape[0]),
+                                  interpolation=cv2.INTER_NEAREST)
+        
+        return predictions.astype(np.int32), inference_time
     else:
         # Keras model handling
         if len(image.shape) == 3:
