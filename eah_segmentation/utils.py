@@ -42,9 +42,32 @@ def load_model(model_name, model_type='keras', device='cpu'):
     
     if model_type == 'tflite':
         # Load TFLite model
-        tflite_path = model_dir / 'tflite' / '1.tflite'
+        if device == 'coral':
+            # For Coral, look in tflite_edgetpu directory first
+            tflite_dir = model_dir / 'tflite_edgetpu'
+            if not tflite_dir.exists():
+                # Fall back to tflite directory if tflite_edgetpu doesn't exist
+                tflite_dir = model_dir / 'tflite'
+        else:
+            tflite_dir = model_dir / 'tflite'
+        
+        # Try standardized name first
+        tflite_path = tflite_dir / ('1_edgetpu.tflite' if device == 'coral' else '1.tflite')
+        
+        # If not found, try to find any .tflite file
         if not tflite_path.exists():
-            raise ValueError(f"TFLite model not found: {tflite_path}")
+            tflite_files = list(tflite_dir.glob('*.tflite'))
+            if not tflite_files:
+                raise ValueError(f"No TFLite model found in: {tflite_dir}")
+            
+            # For Coral, prefer files with 'edgetpu' in name
+            if device == 'coral':
+                edgetpu_files = [f for f in tflite_files if 'edgetpu' in f.name.lower()]
+                tflite_path = edgetpu_files[0] if edgetpu_files else tflite_files[0]
+            else:
+                # For CPU, prefer files without 'edgetpu' in name
+                cpu_files = [f for f in tflite_files if 'edgetpu' not in f.name.lower()]
+                tflite_path = cpu_files[0] if cpu_files else tflite_files[0]
             
         print(f"📥 Loading TFLite model from {tflite_path}")
         if device == 'coral':
@@ -63,15 +86,13 @@ def load_model(model_name, model_type='keras', device='cpu'):
             interpreter.allocate_tensors()
         model = interpreter
     else:
-        # Load Keras/SavedModel
-        keras_path = model_dir / 'keras'
-        if not keras_path.exists():
-            raise ValueError(f"Keras model not found: {keras_path}")
+        # Load Keras model
+        keras_dir = model_dir / 'keras'
+        if not keras_dir.exists():
+            raise ValueError(f"Keras model directory not found: {keras_dir}")
             
-        print(f"📥 Loading Keras model from {keras_path}")
-        model = tf.saved_model.load(str(keras_path))
-        if model is None:
-            raise ValueError(f"Failed to load model: {model_name}")
+        print(f"📥 Loading Keras model from {keras_dir}")
+        model = tf.saved_model.load(str(keras_dir))
     
     load_time = time.perf_counter() - load_start_time
     print(f"⏱️  Model loading time: {load_time:.3f} seconds")

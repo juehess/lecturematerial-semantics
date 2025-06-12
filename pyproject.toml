@@ -21,6 +21,7 @@ dependencies = [
     "transformers",
     "keras-cv",
     "tqdm",
+    "requests>=2.31.0",  # For direct URL downloads
 ]
 
 [project.optional-dependencies]

@@ -6,21 +6,26 @@ import tensorflow as tf
 from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmentation
 import os
 import time
+from typing import Tuple, Union
 
 try:
     from class_mapping import (
         map_segformer_to_ade20k,
         map_mosaic_to_cityscapes,
-        map_cityscapes_to_ade20k
+        map_cityscapes_to_ade20k,
+        map_pascal_to_ade20k
     )
     from model_config import MODEL_NAMES
+    from visualization import colorize_mask
 except ImportError:
     from eah_segmentation.class_mapping import (
         map_segformer_to_ade20k,
         map_mosaic_to_cityscapes,
-        map_cityscapes_to_ade20k
+        map_cityscapes_to_ade20k,
+        map_pascal_to_ade20k
     )
     from eah_segmentation.model_config import MODEL_NAMES
+    from visualization import colorize_mask
 
 def run_segformer_inference(model, image):
     """
@@ -103,13 +108,16 @@ def run_deeplab_inference(model, image):
     Runs inference using DeepLab model.
     
     Key Operations:
-        - Handles input quantization for TFLite models
+        - Handles input quantization for TFLite models:
+          * Resize input to model's expected size
+          * Convert to [-1, 1] range
+          * Quantize to int8 range [-128, 127]
         - Performs standard DeepLab preprocessing
         - Provides detailed debugging information
         
     Args:
         model: TF/TFLite model
-        image (np.ndarray): Input image
+        image (np.ndarray): Input image in [0,1] range
         
     Returns:
         tuple: (predictions, inference_time)
@@ -120,6 +128,22 @@ def run_deeplab_inference(model, image):
         # TFLite model handling
         input_details = model.get_input_details()
         output_details = model.get_output_details()
+        
+        # Print model details
+        print("\n📊 Model Details:")
+        print("Input Details:")
+        for detail in input_details:
+            print(f"  Name: {detail['name']}")
+            print(f"  Shape: {detail['shape']}")
+            print(f"  Type: {detail['dtype']}")
+            print(f"  Quantization: {detail['quantization']}")
+        
+        print("\nOutput Details:")
+        for detail in output_details:
+            print(f"  Name: {detail['name']}")
+            print(f"  Shape: {detail['shape']}")
+            print(f"  Type: {detail['dtype']}")
+            print(f"  Quantization: {detail['quantization']}")
         
         # Get expected input size from model
         input_shape = input_details[0]['shape']
@@ -162,15 +186,16 @@ def run_deeplab_inference(model, image):
         # Process output
         print(f"📊 Raw output shape: {output.shape}")
         print(f"📊 Raw output range: [{np.min(output)}, {np.max(output)}]")
+        print(f"📊 Raw output unique values: {np.unique(output)}")
         
-        # Dequantize output if needed
-        if 'quantization' in output_details[0]:
-            scale, zero_point = output_details[0]['quantization']
-            if scale != 0:  # Only apply if quantization is active
-                output = (output.astype(np.float32) - zero_point) * scale
+        # Get predictions - output already contains class indices
+        predictions = output[0].astype(np.int32)
         
-        # Get predictions
-        predictions = np.argmax(output[0], axis=-1)
+        # Print unique classes in predictions
+        unique_classes, class_counts = np.unique(predictions, return_counts=True)
+        print("\n📊 Predicted classes:")
+        for cls, count in zip(unique_classes, class_counts):
+            print(f"  Class {cls}: {count} pixels")
         
         # Resize predictions back to original size if needed
         if predictions.shape != image.shape[:2]:
@@ -282,6 +307,124 @@ def run_mosaic_inference(model, image):
     
     return predictions_np, inference_time
 
+def quantize_input(img, scale, zero_point, input_details):
+    """
+    Quantizes input image based on the model's actual input requirements.
+    
+    Args:
+        img (np.ndarray): Input image in [0,1] range
+        scale (float): Quantization scale
+        zero_point (int): Quantization zero point
+        input_details (dict): Model input details
+        
+    Returns:
+        np.ndarray: Quantized input image
+    """
+    # Get actual input type after tensor allocation
+    input_type = input_details['dtype']
+    print(f"\n📊 Model expects input type: {input_type}")
+    
+    # For uint8, we can directly scale from [0,1] to [0,255]
+    if input_type == np.uint8:
+        print("🔄 Quantizing to uint8 [0, 255]")
+        img = np.round(img * 255).astype(np.uint8)
+    # For int8, we need to use the quantization parameters
+    elif input_type == np.int8:
+        print("🔄 Quantizing to int8 [-128, 127]")
+        img = np.round(img / scale + zero_point)
+        img = np.clip(img, -128, 127).astype(np.int8)
+    
+    return img
+
+def run_deeplabv3_cityscapes_inference(model, image):
+    """
+    Runs inference using DeepLab v3 Cityscapes model.
+    
+    Key Operations:
+        - Handles input preprocessing for Cityscapes model:
+          * Resize input to 513x513 (model's native size)
+          * Convert directly to uint8 [0,255] (no normalization needed)
+          * Maintain aspect ratio with padding if needed
+        - Performs inference with timing
+        - Maps predictions to ADE20K format
+        - Removes padding and resizes back to input size
+        
+    Args:
+        model: TFLite model
+        image (np.ndarray): Input image in [0,1] range
+        
+    Returns:
+        tuple: (predictions, inference_time)
+            - predictions (np.ndarray): Predictions mapped to ADE20K format
+            - inference_time (float): Time taken for inference in seconds
+    """
+    #if not isinstance(model, tf.lite.Interpreter):
+    #    raise ValueError("DeepLabV3 Cityscapes model must be a TFLite model")
+        
+    # TFLite model handling
+    input_details = model.get_input_details()
+    output_details = model.get_output_details()
+    
+    # Get expected input size from model
+    input_shape = input_details[0]['shape']
+    expected_height, expected_width = input_shape[1:3]
+    
+    # Calculate resize dimensions while preserving aspect ratio
+    h, w = image.shape[:2]
+    scale = min(expected_height/h, expected_width/w)
+    new_h, new_w = int(h * scale), int(w * scale)
+    
+    # Resize using LANCZOS for better quality
+    resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
+    
+    # Create padded image (black padding)
+    resized_image = np.zeros((expected_height, expected_width, 3), dtype=np.float32)
+    y_offset = (expected_height - new_h) // 2
+    x_offset = (expected_width - new_w) // 2
+    resized_image[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+    
+    # Convert to uint8 [0,255] - this is what the model expects
+    img = (resized_image * 255).astype(np.uint8)
+    print(f"\n📊 Input uint8 range: [{np.min(img)}, {np.max(img)}]")
+    
+    # Add batch dimension
+    img = np.expand_dims(img, 0)
+    
+    # Run inference with timing
+    start_time = time.perf_counter()
+    model.set_tensor(input_details[0]['index'], img)
+    model.invoke()
+    output = model.get_tensor(output_details[0]['index'])
+    inference_time = time.perf_counter() - start_time
+    
+    print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
+    
+    # Process output
+    print(f"📊 Raw output shape: {output.shape}")
+    print(f"📊 Raw output range: [{np.min(output)}, {np.max(output)}]")
+    print(f"📊 Raw output unique values: {np.unique(output)}")
+    
+    # Get predictions - output already contains class indices
+    predictions = output[0].astype(np.int32)
+    
+    # Print unique classes in predictions
+    unique_classes, class_counts = np.unique(predictions, return_counts=True)
+    print("\n📊 Predicted classes:")
+    for cls, count in zip(unique_classes, class_counts):
+        print(f"  Class {cls}: {count} pixels")
+    
+    # Map Cityscapes predictions to ADE20k classes
+    predictions = map_cityscapes_to_ade20k(predictions)
+    
+    # Remove padding from predictions to match input aspect ratio
+    predictions = predictions[y_offset:y_offset+new_h, x_offset:x_offset+new_w]
+    
+    # Resize back to original input size
+    predictions = cv2.resize(predictions.astype(np.float32), (w, h), 
+                           interpolation=cv2.INTER_NEAREST)
+    
+    return predictions.astype(np.int32), inference_time
+
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
     """Run inference on a single image using the specified model."""
     print(f"\n📊 Input image shape: {image.shape}")
@@ -294,7 +437,9 @@ def run_inference_on_image(model, image, model_name=None, true_classes=None, gro
     # Run model-specific inference
     if 'segformer' in model_name:
         predictions, inference_time = run_segformer_inference(model, image)
-    elif 'deeplabv3' in model_name:
+    elif 'deeplabv3_cityscapes' in model_name:  # Check cityscapes first
+        predictions, inference_time = run_deeplabv3_cityscapes_inference(model, image)
+    elif 'deeplabv3plus_edgetpu' in model_name:  # Then check general deeplabv3
         predictions, inference_time = run_deeplab_inference(model, image)
     elif 'mosaic' in model_name:
         predictions, inference_time = run_mosaic_inference(model, image)

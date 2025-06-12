@@ -4,31 +4,32 @@ import numpy as np
 
 """
 This module provides utilities for colorizing segmentation masks using
-the Cityscapes color palette. It's primarily used for visualizing
-semantic segmentation predictions.
+a modified Cityscapes color palette that better matches ADE20K colors.
+It's primarily used for visualizing semantic segmentation predictions.
 
 Key Features:
-- Implements Cityscapes color scheme
+- Implements modified Cityscapes color scheme to match ADE20K
 - Efficient vectorized color mapping
 - Handles invalid class indices
 """
 
 def colorize_mask(seg_mask):
     """
-    Converts a segmentation mask to a colored visualization using Cityscapes colors.
+    Converts a segmentation mask to a colored visualization using modified colors
+    that better match ADE20K's color scheme.
     
     Color Palette:
         - Background: Black (0, 0, 0)
-        - Road: Purple-Gray (128, 64, 128)
-        - Sidewalk: Pink (244, 35, 232)
-        - Building: Dark Gray (70, 70, 70)
-        - Wall: Blue-Gray (102, 102, 156)
+        - Road: Gray (128, 128, 128)  # More similar to ADE20K road
+        - Sidewalk: Light Gray (200, 200, 200)  # More similar to ADE20K sidewalk
+        - Building: Brown (128, 64, 64)  # More similar to ADE20K building
+        - Wall: Dark Gray (70, 70, 70)  # Matches ADE20K wall
         - And 15 more classes...
     
     Key Features:
         - Vectorized implementation for efficiency
         - Clips invalid class indices
-        - Uses standard Cityscapes colors
+        - Uses colors more aligned with ADE20K palette
     
     Args:
         seg_mask (np.ndarray): Segmentation mask of shape (H, W) with class indices
@@ -36,28 +37,28 @@ def colorize_mask(seg_mask):
     Returns:
         np.ndarray: Colored mask of shape (H, W, 3) with RGB values
     """
-    # Cityscapes color palette
+    # Modified color palette to better match ADE20K colors
     palette = [
-        (0, 0, 0),        # background
-        (128, 64, 128),   # road
-        (244, 35, 232),   # sidewalk
-        (70, 70, 70),     # building
-        (102, 102, 156),  # wall
-        (190, 153, 153),  # fence
-        (153, 153, 153),  # pole
-        (250, 170, 30),   # traffic light
-        (220, 220, 0),    # traffic sign
-        (107, 142, 35),   # vegetation
-        (152, 251, 152),  # terrain
-        (70, 130, 180),   # sky
-        (220, 20, 60),    # person
-        (255, 0, 0),      # rider
-        (0, 0, 142),      # car
-        (0, 0, 70),       # truck
-        (0, 60, 100),     # bus
-        (0, 80, 100),     # train
-        (0, 0, 230),      # motorcycle
-        (119, 11, 32)     # bicycle
+        (0, 0, 0),        # background -> black (same)
+        (128, 128, 128),  # road -> gray (more like ADE20K)
+        (200, 200, 200),  # sidewalk -> light gray (more like ADE20K)
+        (128, 64, 64),    # building -> brown (more like ADE20K)
+        (70, 70, 70),     # wall -> dark gray (matches ADE20K)
+        (153, 153, 153),  # fence -> gray (similar to ADE20K)
+        (128, 128, 0),    # pole -> yellow-gray (more like ADE20K)
+        (250, 170, 30),   # traffic light -> orange (kept distinctive)
+        (220, 220, 0),    # traffic sign -> yellow (kept distinctive)
+        (107, 142, 35),   # vegetation -> green (matches ADE20K)
+        (152, 251, 152),  # terrain -> light green (similar to ADE20K)
+        (70, 130, 180),   # sky -> blue (matches ADE20K)
+        (220, 20, 60),    # person -> red (matches ADE20K)
+        (255, 0, 0),      # rider -> bright red (similar to ADE20K person)
+        (0, 0, 142),      # car -> dark blue (more like ADE20K)
+        (0, 0, 70),       # truck -> darker blue (variation of vehicle)
+        (0, 60, 100),     # bus -> blue (variation of vehicle)
+        (0, 80, 100),     # train -> blue (variation of vehicle)
+        (0, 0, 230),      # motorcycle -> bright blue (variation of vehicle)
+        (119, 11, 32)     # bicycle -> dark red (variation of vehicle)
     ]
 
     h, w = seg_mask.shape

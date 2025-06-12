@@ -37,6 +37,12 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
     # Initialize timing statistics
     inference_times = []
     
+    # Determine model type for visualization
+    model_type = 'ade20k'
+    if model_name:
+        if 'cityscapes' in model_name.lower():
+            model_type = 'cityscapes'
+    
     for i, (image, true_mask) in enumerate(dataset):
         if i >= num_images:
             break
@@ -62,7 +68,8 @@ def evaluate_model(model, dataset, output_dir, num_images=10, model_name=None):
             true_mask.numpy()[0],
             pred_mask,
             output_dir,
-            i
+            i,
+            model_type=model_type
         )
         
         print(f"✅ Processed image {i+1}/{num_images}")

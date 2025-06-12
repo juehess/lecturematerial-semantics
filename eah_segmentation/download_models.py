@@ -1,4 +1,3 @@
-
 import os
 import shutil
 import kagglehub
@@ -8,15 +7,19 @@ from tensorflow import keras
 import keras_hub
 from pathlib import Path
 import cv2
+import requests
+import urllib.parse
 
 """
 eah_segmentation/download_models.py
 
 This module handles the downloading and conversion of various segmentation models from Kaggle Hub.
-It manages three types of models:
+It manages multiple types of models:
 1. DeepLabV3+ EdgeTPU (both Keras and TFLite formats)
 2. Mosaic (TFLite format)
 3. SegFormer B0 (converts from Keras to TFLite format)
+4. DeepLab v3 Pascal VOC (TFLite and EdgeTPU formats)
+5. DeepLab v3 Cityscapes (TFLite and EdgeTPU formats)
 
 The module provides functionality to download pre-trained models, organize them in a consistent
 directory structure, and perform model conversion with optimizations.
@@ -35,6 +38,18 @@ MODEL_PATHS = {
     },
     "mosaic": {
         "tflite": "google/mosaic/tfLite/mobilenetmultiavgseg/1"
+    },
+    "deeplabv3_cityscapes": {
+        "tflite": {
+            # Regular TFLite model for CPU inference
+            "url": "https://raw.githubusercontent.com/google-coral/test_data/master/deeplab_mobilenet_edgetpu_slim_cityscapes_quant.tflite",
+            "filename": "1.tflite"
+        },
+        "tflite_edgetpu": {
+            # EdgeTPU-optimized model
+            "url": "https://raw.githubusercontent.com/google-coral/test_data/master/deeplab_mobilenet_edgetpu_slim_cityscapes_quant_edgetpu.tflite",
+            "filename": "1_edgetpu.tflite"
+        }
     }
 }
 
@@ -42,24 +57,55 @@ MODEL_PATHS = {
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "..", "models")
 
-def download_model(name, model_paths, model_dir):
+def download_from_url(url, target_path, filename=None):
     """
-    Downloads model files from Kaggle Hub and organizes them in a consistent directory structure.
+    Downloads a file from a URL to a target path.
     
     Args:
-        name (str): Name of the model to download (e.g., 'deeplabv3plus_edgetpu', 'mosaic')
+        url (str): URL to download from
+        target_path (str): Path where to save the downloaded file
+        filename (str, optional): Specific filename to use instead of the URL's filename
+        
+    Returns:
+        str: Path to the downloaded file
+    """
+    print(f"📥 Downloading from {url}...")
+    
+    # Create directory if it doesn't exist
+    target_dir = os.path.dirname(target_path)
+    os.makedirs(target_dir, exist_ok=True)
+    
+    # Use specified filename if provided, otherwise use the original filename
+    if filename:
+        target_path = os.path.join(target_dir, filename)
+    
+    # Download the file
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    
+    with open(target_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+            
+    print(f"✅ Downloaded to {target_path}")
+    return target_path
+
+def download_model(name, model_paths, model_dir):
+    """
+    Downloads model files from Kaggle Hub or direct URLs and organizes them in a consistent directory structure.
+    
+    Args:
+        name (str): Name of the model to download
         model_paths (dict): Dictionary containing paths for different formats of the model
         model_dir (str): Base directory where models should be stored
     
     Key Operations:
         1. Creates model-specific directories
-        2. Downloads each format (keras/tflite) from Kaggle Hub
+        2. Downloads each format (keras/tflite/etc.) from source
         3. Organizes downloaded files into format-specific subdirectories
-    
-    Raises:
-        Exception: If download or file organization fails
+        4. Handles both Kaggle Hub paths and direct URLs
     """
-    print(f"\n🔄 Downloading {name} from Kaggle Hub...")
+    print(f"\n🔄 Downloading {name}...")
     
     # Create model-specific directory
     model_specific_dir = os.path.join(model_dir, name)
@@ -67,21 +113,33 @@ def download_model(name, model_paths, model_dir):
     
     try:
         # Download each available format
-        for format_type, kaggle_path in model_paths.items():
-            print(f"📥 Downloading {format_type} format...")
-            model_src = kagglehub.model_download(kaggle_path)
-            print(f"✅ Downloaded {format_type} to {model_src}")
-
-            # Create format-specific directory
+        for format_type, path in model_paths.items():
             format_dir = os.path.join(model_specific_dir, format_type)
+            
+            # Skip if already exists
             if os.path.exists(format_dir):
-                print(f"✅ {format_type} already exists at {format_dir}, skipping copy.")
-            else:
+                print(f"✅ {format_type} already exists at {format_dir}, skipping download.")
+                continue
+                
+            # Handle different types of paths
+            if isinstance(path, str):
+                # Kaggle Hub download
+                print(f"📥 Downloading {format_type} format from Kaggle Hub...")
+                model_src = kagglehub.model_download(path)
+                print(f"✅ Downloaded {format_type} to {model_src}")
                 shutil.copytree(model_src, format_dir)
                 print(f"✅ Copied {format_type} to {format_dir}")
-                
+            elif isinstance(path, dict):
+                # Direct URL download with specified filename
+                os.makedirs(format_dir, exist_ok=True)
+                url = path['url']
+                filename = path['filename']
+                target_path = os.path.join(format_dir, filename)
+                download_from_url(url, target_path, filename)
+                    
     except Exception as e:
         print(f"❌ Failed to process {name}: {e}")
+        raise
 
 def representative_dataset_gen():
     """

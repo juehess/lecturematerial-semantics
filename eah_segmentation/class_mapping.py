@@ -1,4 +1,11 @@
-"""Class mapping utilities for different segmentation models."""
+"""
+Class mapping utilities for semantic segmentation models.
+
+This module provides functionality to map class indices between:
+- Cityscapes → ADE20K
+
+The mappings are based on semantic similarity between classes.
+"""
 
 import numpy as np
 
@@ -96,5 +103,48 @@ def map_cityscapes_to_ade20k(predictions):
     mapping_array = np.zeros(max_idx + 1, dtype=np.int32)
     for cityscapes_idx, ade20k_idx in mapping.items():
         mapping_array[cityscapes_idx] = ade20k_idx
+    
+    return mapping_array[predictions]
+
+def map_pascal_to_ade20k(predictions):
+    """
+    Maps Pascal VOC class indices to ADE20K class indices.
+    
+    Args:
+        predictions (np.ndarray): Predictions with Pascal VOC class indices
+        
+    Returns:
+        np.ndarray: Predictions mapped to ADE20K class indices
+    """
+    # Mapping from Pascal VOC to ADE20K classes
+    mapping = {
+        0: 0,    # background -> background
+        1: 13,   # person -> person
+        2: 21,   # car -> car
+        3: 28,   # bus -> bus
+        4: 27,   # truck -> truck
+        5: 30,   # motorcycle -> motorcycle
+        6: 31,   # bicycle -> bicycle
+        7: 21,   # vegetation -> vegetation
+        8: 23,   # sky -> sky
+        9: 2,    # road -> road
+        10: 3,   # sidewalk -> sidewalk
+        11: 1,   # building -> building
+        12: 4,   # wall -> wall
+        13: 5,   # fence -> fence
+        14: 17,  # pole -> pole
+        15: 19,  # traffic light -> traffic light
+        16: 20,  # traffic sign -> traffic sign
+        17: 22,  # terrain -> terrain
+        18: 24,  # person -> person (duplicate)
+        19: 25,  # rider -> rider
+        20: 26   # car -> car (duplicate)
+    }
+    
+    # Create mapping array
+    max_idx = max(mapping.keys())
+    mapping_array = np.zeros(max_idx + 1, dtype=np.int32)
+    for pascal_idx, ade20k_idx in mapping.items():
+        mapping_array[pascal_idx] = ade20k_idx
     
     return mapping_array[predictions] 

@@ -149,25 +149,26 @@ def colorize_ade20k_mask(mask):
     
     return color_mask
 
-def save_prediction(image, true_mask, pred_mask, output_dir, index):
+def save_prediction(image, true_mask, pred_mask, output_dir, index, model_type='ade20k'):
     """
     Saves a side-by-side visualization of segmentation results.
     
     Creates a visualization containing:
     - Original image
-    - Ground truth segmentation mask
-    - Predicted segmentation mask
+    - Ground truth segmentation mask (using ADE20K colormap)
+    - Predicted segmentation mask (using ADE20K colormap)
     
     Args:
         image (np.ndarray): Original image (H, W, 3)
         true_mask (np.ndarray): Ground truth mask (H, W)
-        pred_mask (np.ndarray): Predicted mask (H, W)
+        pred_mask (np.ndarray): Predicted mask (H, W) in ADE20K format
         output_dir (str): Directory to save visualization
         index (int): Image index for filename
+        model_type (str): Type of model ('ade20k' or 'cityscapes')
     """
     os.makedirs(output_dir, exist_ok=True)
     
-    # Convert masks to color images
+    # Convert both masks using ADE20K colormap
     true_color = colorize_ade20k_mask(true_mask)
     pred_color = colorize_ade20k_mask(pred_mask)
     
