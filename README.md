@@ -81,14 +81,35 @@ The project includes two Jupyter notebooks for different purposes:
    - Guides through model usage and evaluation
    - Helps understand semantic segmentation concepts
 
-To start working with the notebooks:
+To start working with the notebooks, you can use either Jupyter Notebook or Jupyter Lab:
+
+#### Using Jupyter Notebook
 ```bash
-# Start Jupyter
+# Start Jupyter Notebook
 jupyter notebook
 
 # Navigate to the notebooks directory
 cd notebooks
 ```
+
+#### Using Jupyter Lab (Recommended)
+```bash
+# Start Jupyter Lab
+jupyter lab
+
+# Navigate to the notebooks directory
+cd notebooks
+```
+
+Jupyter Lab provides a more modern interface with:
+- File browser
+- Multiple notebook tabs
+- Integrated terminal
+- Split views
+- Better code completion
+- Enhanced visualization capabilities
+
+Both interfaces will work with the provided notebooks, but Jupyter Lab offers a more comprehensive development environment.
 
 ### Raspberry Pi Deployment
 

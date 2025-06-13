@@ -7,6 +7,7 @@ from transformers import SegformerImageProcessor, TFSegformerForSemanticSegmenta
 import os
 import time
 from typing import Tuple, Union
+import psutil
 
 try:
     from class_mapping import (
@@ -42,9 +43,10 @@ def run_segformer_inference(model, image):
         image (np.ndarray): Preprocessed input image
         
     Returns:
-        tuple: (predictions, inference_time)
+        tuple: (predictions, inference_time, ram_delta_kb)
             - predictions (np.ndarray): Segmentation mask with ADE20K class indices
             - inference_time (float): Time taken for inference in seconds
+            - ram_delta_kb (float): RAM delta in kilobytes
     """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
@@ -57,10 +59,16 @@ def run_segformer_inference(model, image):
         # Set input tensor
         model.set_tensor(input_details[0]['index'], inp)
         
+        # Measure RAM before inference
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
+        
         # Run inference with timing
         start_time = time.perf_counter()
         model.invoke()
         inference_time = time.perf_counter() - start_time
+        mem_after = process.memory_info().rss
+        ram_delta_kb = (mem_after - mem_before) // 1024
         print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
         
         # Get predictions directly
@@ -76,10 +84,16 @@ def run_segformer_inference(model, image):
         else:
             inp = image
         
+        # Measure RAM before inference
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
+        
         # Run inference using the serving function with timing
         start_time = time.perf_counter()
         outputs = model.signatures['serving_default'](inp)
         inference_time = time.perf_counter() - start_time
+        mem_after = process.memory_info().rss
+        ram_delta_kb = (mem_after - mem_before) // 1024
         print(f"⏱️ Keras inference time: {inference_time*1000:.2f}ms")
         
         # Get predictions from the output tensor
@@ -101,7 +115,7 @@ def run_segformer_inference(model, image):
         predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
                                   interpolation=cv2.INTER_NEAREST)
     
-    return predictions_np, inference_time
+    return predictions_np, inference_time, ram_delta_kb
 
 def run_deeplab_inference(model, image):
     """
@@ -120,9 +134,10 @@ def run_deeplab_inference(model, image):
         image (np.ndarray): Input image in [0,1] range
         
     Returns:
-        tuple: (predictions, inference_time)
+        tuple: (predictions, inference_time, ram_delta_kb)
             - predictions (np.ndarray): Segmentation predictions
             - inference_time (float): Time taken for inference in seconds
+            - ram_delta_kb (float): RAM delta in kilobytes
     """
     if isinstance(model, tf.lite.Interpreter):
         # TFLite model handling
@@ -174,12 +189,18 @@ def run_deeplab_inference(model, image):
         
         img = np.expand_dims(img, 0)
         
+        # Measure RAM before inference
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
+        
         # Run inference with timing
-        start_time = time.perf_counter()
         model.set_tensor(input_details[0]['index'], img)
+        start_time = time.perf_counter()
         model.invoke()
         output = model.get_tensor(output_details[0]['index'])
         inference_time = time.perf_counter() - start_time
+        mem_after = process.memory_info().rss
+        ram_delta_kb = (mem_after - mem_before) // 1024
         
         print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
         
@@ -203,7 +224,7 @@ def run_deeplab_inference(model, image):
                                   (image.shape[1], image.shape[0]),
                                   interpolation=cv2.INTER_NEAREST)
         
-        return predictions.astype(np.int32), inference_time
+        return predictions.astype(np.int32), inference_time, ram_delta_kb
     else:
         # Keras model handling
         if len(image.shape) == 3:
@@ -211,15 +232,21 @@ def run_deeplab_inference(model, image):
         else:
             inp = image
             
+        # Measure RAM before inference
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
+        
         # Run inference with timing
         start_time = time.perf_counter()
         preds = model(inp, training=False)
         inference_time = time.perf_counter() - start_time
+        mem_after = process.memory_info().rss
+        ram_delta_kb = (mem_after - mem_before) // 1024
         print(f"⏱️ Keras inference time: {inference_time*1000:.2f}ms")
         
         if isinstance(preds, tuple):
             preds = preds[0]
-        return preds[0].numpy().astype(np.int32), inference_time
+        return preds[0].numpy().astype(np.int32), inference_time, ram_delta_kb
 
 def run_mosaic_inference(model, image):
     """
@@ -235,9 +262,10 @@ def run_mosaic_inference(model, image):
         image (np.ndarray): Input image in range [0, 1]
         
     Returns:
-        tuple: (predictions, inference_time)
+        tuple: (predictions, inference_time, ram_delta_kb)
             - predictions (np.ndarray): Segmentation predictions in ADE20K format
             - inference_time (float): Time taken for inference in seconds
+            - ram_delta_kb (float): RAM delta in kilobytes
     """
     if not isinstance(model, tf.lite.Interpreter):
         raise ValueError("Mosaic model must be a TFLite model")
@@ -262,11 +290,17 @@ def run_mosaic_inference(model, image):
     print(f"📊 Input tensor shape: {inp_resized.shape}")
     print(f"📊 Input tensor range: [{np.min(inp_resized)}, {np.max(inp_resized)}]")
     
+    # Measure RAM before inference
+    process = psutil.Process(os.getpid())
+    mem_before = process.memory_info().rss
+    
     # Run inference with timing
     model.set_tensor(input_details[0]['index'], inp_resized)
     start_time = time.perf_counter()
     model.invoke()
     inference_time = time.perf_counter() - start_time
+    mem_after = process.memory_info().rss
+    ram_delta_kb = (mem_after - mem_before) // 1024
     print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
     
     # Get predictions directly
@@ -305,7 +339,7 @@ def run_mosaic_inference(model, image):
         predictions_np = cv2.resize(predictions_np, (image.shape[1], image.shape[0]), 
                                   interpolation=cv2.INTER_NEAREST)
     
-    return predictions_np, inference_time
+    return predictions_np, inference_time, ram_delta_kb
 
 def quantize_input(img, scale, zero_point, input_details):
     """
@@ -354,9 +388,10 @@ def run_deeplabv3_cityscapes_inference(model, image):
         image (np.ndarray): Input image in [0,1] range
         
     Returns:
-        tuple: (predictions, inference_time)
+        tuple: (predictions, inference_time, ram_delta_kb)
             - predictions (np.ndarray): Predictions mapped to ADE20K format
             - inference_time (float): Time taken for inference in seconds
+            - ram_delta_kb (float): RAM delta in kilobytes
     """
     #if not isinstance(model, tf.lite.Interpreter):
     #    raise ValueError("DeepLabV3 Cityscapes model must be a TFLite model")
@@ -390,12 +425,18 @@ def run_deeplabv3_cityscapes_inference(model, image):
     # Add batch dimension
     img = np.expand_dims(img, 0)
     
+    # Measure RAM before inference
+    process = psutil.Process(os.getpid())
+    mem_before = process.memory_info().rss
+    
     # Run inference with timing
-    start_time = time.perf_counter()
     model.set_tensor(input_details[0]['index'], img)
+    start_time = time.perf_counter()
     model.invoke()
     output = model.get_tensor(output_details[0]['index'])
     inference_time = time.perf_counter() - start_time
+    mem_after = process.memory_info().rss
+    ram_delta_kb = (mem_after - mem_before) // 1024
     
     print(f"⏱️ TFLite inference time: {inference_time*1000:.2f}ms")
     
@@ -423,7 +464,7 @@ def run_deeplabv3_cityscapes_inference(model, image):
     predictions = cv2.resize(predictions.astype(np.float32), (w, h), 
                            interpolation=cv2.INTER_NEAREST)
     
-    return predictions.astype(np.int32), inference_time
+    return predictions.astype(np.int32), inference_time, ram_delta_kb
 
 def run_inference_on_image(model, image, model_name=None, true_classes=None, ground_truth=None):
     """Run inference on a single image using the specified model."""
@@ -436,14 +477,14 @@ def run_inference_on_image(model, image, model_name=None, true_classes=None, gro
     
     # Run model-specific inference
     if 'segformer' in model_name:
-        predictions, inference_time = run_segformer_inference(model, image)
+        predictions, inference_time, ram_delta_kb = run_segformer_inference(model, image)
     elif 'deeplabv3_cityscapes' in model_name:  # Check cityscapes first
-        predictions, inference_time = run_deeplabv3_cityscapes_inference(model, image)
+        predictions, inference_time, ram_delta_kb = run_deeplabv3_cityscapes_inference(model, image)
     elif 'deeplabv3plus_edgetpu' in model_name:  # Then check general deeplabv3
-        predictions, inference_time = run_deeplab_inference(model, image)
+        predictions, inference_time, ram_delta_kb = run_deeplab_inference(model, image)
     elif 'mosaic' in model_name:
-        predictions, inference_time = run_mosaic_inference(model, image)
+        predictions, inference_time, ram_delta_kb = run_mosaic_inference(model, image)
     else:
         raise ValueError(f"Unknown model type: {model_name}")
         
-    return predictions, inference_time
+    return predictions, inference_time, ram_delta_kb
