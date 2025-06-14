@@ -23,6 +23,7 @@ dependencies:
       - tensorflow-io-gcs-filesystem>=0.24.0
       - kagglehub>=0.2.0
       - transformers>=4.30.0
+      - ai_edge_litert>=0.1.0  # New LiteRT interpreter
       
       # Model-specific dependencies
       - keras-cv>=0.5.10

@@ -22,6 +22,7 @@ dependencies:
       - --extra-index-url https://google-coral.github.io/py-repo/
       - pycoral~=2.0
       - tflite-runtime~=2.5.0
+      - ai_edge_litert>=0.1.0  # New LiteRT interpreter
       
       # OpenCV (headless version for better performance)
       - opencv-python-headless>=4.8.0

@@ -1,17 +1,35 @@
 """Utility functions for model loading and other common operations."""
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import time
 import json
 from pathlib import Path
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
+from typing import Union, Tuple, Dict, List, Optional
+import psutil
+import traceback
 
+# Import model config
 try:
     from model_config import MODEL_NAMES
 except ImportError:
     from eah_segmentation.model_config import MODEL_NAMES
+
+# Import LiteRT if available
+USE_LITERT = False
+try:
+    from ai_edge_litert.interpreter import Interpreter as LiteRTInterpreter
+    USE_LITERT = True
+except Exception as e:
+    print(f"Warning: Failed to import ai_edge_litert:")
+    print(f"Exception type: {type(e).__name__}")
+    print(f"Exception message: {str(e)}")
+    print("Full traceback:")
+    traceback.print_exc()
+    print("Falling back to tf.lite.Interpreter.")
 
 def load_model(model_name, model_type='keras', device='cpu'):
     """
@@ -79,10 +97,16 @@ def load_model(model_name, model_type='keras', device='cpu'):
             except Exception as e:
                 print(f"❌ Failed to load model on Coral TPU: {str(e)}")
                 print("⚠️ Falling back to CPU")
-                interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+                if USE_LITERT:
+                    interpreter = LiteRTInterpreter(model_path=str(tflite_path))
+                else:
+                    interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
                 interpreter.allocate_tensors()
         else:
-            interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
+            if USE_LITERT:
+                interpreter = LiteRTInterpreter(model_path=str(tflite_path))
+            else:
+                interpreter = tf.lite.Interpreter(model_path=str(tflite_path))
             interpreter.allocate_tensors()
         model = interpreter
     else:

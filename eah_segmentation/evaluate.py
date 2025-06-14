@@ -1,6 +1,7 @@
 """Command-line interface for model evaluation."""
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from pathlib import Path
 import argparse
 from datetime import datetime
@@ -30,6 +31,8 @@ def main():
                       help='Index of the image to test (default: 0)')
     parser.add_argument('--device', type=str, choices=['cpu', 'coral'], default='cpu',
                       help='Device to run inference on (cpu or coral)')
+    parser.add_argument('--debug', type=lambda x: x.lower() == 'true', choices=[True, False], default=False,
+                      help='Enable debug mode with additional logging')
     
     args = parser.parse_args()
     
@@ -58,7 +61,7 @@ def main():
             model, load_time = load_model(model_name, args.model_type, args.device)
             
             # Evaluate model
-            results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name)
+            results = evaluate_model(model, dataset, model_output_dir, args.num_images, model_name, debug=args.debug)
             results['load_time'] = load_time
             
             # Save individual model results

@@ -1,189 +1,274 @@
 # EAH Semantic Segmentation
 
-A demonstration of semantic segmentation with multiple models using TensorFlow, with support for deployment on embedded systems like Raspberry Pi and Coral EdgeTPU.
+A comprehensive demonstration of semantic segmentation with multiple models using TensorFlow, featuring support for deployment on embedded systems like Raspberry Pi and Coral EdgeTPU. This project is designed for both educational purposes and practical applications in computer vision.
 
-## Installation
+## Features
 
-The package can be installed in different ways depending on your use case:
+- **Multiple Model Support**: Compare and evaluate different segmentation models
+  - SegFormer-B0: State-of-the-art transformer-based model
+  - DeepLabV3+ (EdgeTPU optimized): Efficient model for edge devices
+  - Mosaic: Custom model for specific use cases
 
-### Local Development (with Jupyter Notebooks)
+- **Interactive Learning**: Jupyter notebooks for hands-on experience
+  - Presentation demos with visualizations
+  - Student practice exercises
+  - Real-time model evaluation
 
-For local development, including running the Jupyter notebooks:
+- **Edge Device Support**: Deploy models on Raspberry Pi with Coral EdgeTPU
+  - Optimized inference
+  - Remote execution capabilities
+  - Performance benchmarking
 
+## Quick Start Guide
+
+### 1. Environment Setup
+
+Create and activate the conda environment:
 ```bash
-# Create and activate conda environment
 conda env create -f environment.yml
 conda activate eah_segmentation
+```
 
-# Install package with development dependencies
+### 2. Package Installation
+
+Install the package with development dependencies:
+```bash
 pip install -e ".[dev]"
 ```
 
-This installs all development dependencies including Jupyter, matplotlib, and paramiko for SSH connections.
+This installs all necessary packages including:
+- Jupyter and JupyterLab
+- TensorFlow and related libraries
+- Visualization tools
+- SSH utilities for remote execution
 
-### Raspberry Pi Deployment
+### 3. Download Resources
 
-For deploying on a Raspberry Pi with Coral EdgeTPU:
-
+Set up required directories and download models and dataset:
 ```bash
-# Create and activate conda environment
-conda env create -f environment_raspberry.yml
-conda activate eah_segmentation_raspberry
+# Create directories
+mkdir -p models datasets
 
-# Install package
-pip install -e .
-```
-
-This installs the necessary dependencies for running inference on the Raspberry Pi with Coral EdgeTPU support.
-
-## Downloading Models and Dataset
-
-### Models
-The package supports three models:
-1. SegFormer-B0
-2. DeepLabV3+ (EdgeTPU optimized)
-3. Mosaic
-
-To download the models, run:
-```bash
-# Create models directory
-mkdir -p models
-
-# Download models
+# Download pre-trained models
 python -m eah_segmentation.download_models
+
+# Download ADE20K dataset
+python -m eah_segmentation.download_dataset
 ```
 
-### ADE20K Dataset
-The ADE20K dataset is required for testing. You can download it using:
+### 4. Launch Jupyter Environment
+
+Start Jupyter Lab (recommended) or Jupyter Notebook:
 ```bash
-# Create datasets directory
-mkdir -p datasets
-
-# Download ADE20K dataset (this will be handled automatically by the package)
-python -c "from eah_segmentation.ade20k_utils import download_ade20k; download_ade20k()"
-```
-
-## Usage
-
-### Jupyter Notebooks
-
-The project includes two Jupyter notebooks for different purposes:
-
-1. `notebooks/presentation_demo.ipynb`:
-   - Designed for presentations and demonstrations
-   - Runs models and visualizes results
-   - Includes performance metrics and comparisons
-   - Can run inference on Raspberry Pi via SSH
-
-2. `notebooks/student_practice.ipynb`:
-   - Designed for student practice sessions
-   - Includes specific questions and tasks
-   - Guides through model usage and evaluation
-   - Helps understand semantic segmentation concepts
-
-To start working with the notebooks, you can use either Jupyter Notebook or Jupyter Lab:
-
-#### Using Jupyter Notebook
-```bash
-# Start Jupyter Notebook
-jupyter notebook
-
-# Navigate to the notebooks directory
-cd notebooks
-```
-
-#### Using Jupyter Lab (Recommended)
-```bash
-# Start Jupyter Lab
+# Start Jupyter Lab (recommended)
 jupyter lab
 
-# Navigate to the notebooks directory
-cd notebooks
+# Or start Jupyter Notebook
+jupyter notebook
 ```
 
-Jupyter Lab provides a more modern interface with:
-- File browser
-- Multiple notebook tabs
-- Integrated terminal
-- Split views
-- Better code completion
-- Enhanced visualization capabilities
+Navigate to the `notebooks` directory to access:
+- `presentation_demo.ipynb`: Interactive demonstrations and model comparisons
+- `student_practice.ipynb`: Guided learning exercises
 
-Both interfaces will work with the provided notebooks, but Jupyter Lab offers a more comprehensive development environment.
+#### Accessing Jupyter Lab in Browser
 
-### Raspberry Pi Deployment
-
-The notebooks can run inference on a Raspberry Pi with Coral EdgeTPU via SSH. To set this up:
-
-1. Ensure the Raspberry Pi is running and accessible via SSH
-2. In the notebooks, configure the SSH connection:
-   ```python
-   from eah_segmentation.ssh_utils import setup_ssh
-   
-   # Configure SSH connection
-   ssh_config = {
-       'hostname': 'raspberry_pi_ip',
-       'username': 'pi',
-       'password': 'your_password'  # Or use key-based authentication
-   }
-   ssh_client = setup_ssh(ssh_config)
+1. When you start Jupyter Lab, it will display a URL in the terminal, typically:
+   ```
+   http://localhost:8888/lab?token=<your-token>
    ```
 
-3. Use the provided functions to run inference remotely:
-   ```python
-   from eah_segmentation.inference import run_remote_inference
-   
-   # Run inference on Raspberry Pi
-   results = run_remote_inference(ssh_client, model_name, image_path)
-   ```
+2. Open this URL in your web browser to access Jupyter Lab
 
-### Testing Models
-To test the models on the ADE20K dataset:
+3. If you're running Jupyter Lab on a remote machine (like Raspberry Pi):
+   - Use the machine's IP address instead of localhost
+   - Example: `http://192.168.1.100:8888/lab?token=<your-token>`
+   - Make sure the port (8888) is not blocked by firewall
 
+## Why Jupyter Lab?
+
+Jupyter Lab is our recommended interface for several compelling reasons:
+
+### Enhanced Development Experience
+- Modern, integrated development environment
+- File browser and terminal in one window
+- Multiple notebook tabs and split views
+- Real-time code execution and visualization
+
+### Advanced Features
+- Enhanced code completion and IntelliSense
+- Rich text editing with Markdown support
+- Interactive data visualization
+- Integrated debugging tools
+- Git integration
+
+### Performance Benefits
+- Better handling of large notebooks
+- Improved memory management
+- Faster startup times
+- More responsive interface
+
+## Working with Models
+
+### Available Models
+
+1. **SegFormer-B0**
+   - Transformer-based architecture
+   - Trained on ADE20K dataset
+   - Excellent accuracy for general scene understanding
+   - Suitable for high-performance applications
+
+2. **DeepLabV3+ (EdgeTPU optimized)**
+   - Optimized for edge devices
+   - Trained on ADE20K dataset
+   - Efficient inference
+   - Coral EdgeTPU compatible
+
+3. **DeepLabV3**
+   - Standard version
+   - Trained on Cityscapes dataset
+   - Optimized for urban scene segmentation
+   - Good for street scenes and urban environments
+
+4. **Mosaic**
+   - Custom implementation
+   - Trained on Cityscapes dataset
+   - Specialized for urban scenarios
+   - Balanced performance for street scenes
+
+### Model Evaluation
+
+Test models on the ADE20K dataset:
 ```bash
-# Run evaluation on multiple models
+# Evaluate multiple models
 python -m eah_segmentation.evaluate --models segformer_b0 deeplabv3plus_edgetpu mosaic --num_images 5
 
-# Run evaluation on a single model
+# Single model evaluation
 python -m eah_segmentation.evaluate --models segformer_b0 --num_images 1
 
-# Run evaluation using TFLite models
+# TFLite model evaluation
 python -m eah_segmentation.evaluate --models segformer_b0 deeplabv3plus_edgetpu mosaic --model_type tflite --num_images 5
 ```
 
 ### Command Line Arguments
 - `--models`: List of model names to test (required)
-- `--model_type`: Type of model to use ('tflite' or 'keras', default: 'keras')
-- `--num_images`: Number of images to test on (default: 1)
-- `--output_dir`: Directory to save results (default: 'results')
-- `--data_dir`: Directory containing ADE20K dataset (default: 'datasets')
-- `--image_index`: Index of the image to test (default: 0)
+  - Available options: segformer_b0, deeplabv3plus_edgetpu, mosaic
+  - Can specify multiple models separated by spaces
+- `--model_type`: Type of model to use
+  - Options: 'tflite' or 'keras' (default: 'keras')
+  - Use 'tflite' for optimized edge deployment
+- `--num_images`: Number of images to test on
+  - Default: 1
+  - Higher values for more comprehensive evaluation
+- `--output_dir`: Directory to save results
+  - Default: 'results'
+  - Creates model-specific subdirectories
+- `--data_dir`: Directory containing ADE20K dataset
+  - Default: 'datasets'
+  - Must contain the ADE20K validation set
+- `--image_index`: Index of the image to test
+  - Default: 0
+  - Useful for testing specific images
 
-### Results
-For each processed image, a single visualization file is created in the model-specific output directory (e.g., `results/segformer_b0_keras/`). The visualization is a horizontal concatenation of three images:
-- Left: Original RGB image
-- Middle: Ground truth segmentation mask (colorized)
-- Right: Predicted segmentation mask (colorized)
+## Raspberry Pi Deployment
 
-The files are named `prediction_XXXX.png` where XXXX is the image index.
+### Setup Instructions
+
+1. Create and activate the Raspberry Pi environment:
+```bash
+conda env create -f environment_raspberry.yml
+conda activate eah_segmentation_raspberry
+pip install -e .
+```
+
+2. Find your Raspberry Pi's IP address:
+```bash
+# On Raspberry Pi, run:
+hostname -I
+
+# Or check your router's admin interface
+# The IP will be something like 192.168.1.100
+```
+
+3. Connect to Raspberry Pi via SSH:
+```bash
+# Default username is 'pi'
+ssh pi@192.168.1.100  # Replace with your Raspberry Pi's IP
+
+# If this is your first time connecting, you'll see a fingerprint warning
+# Type 'yes' to continue
+
+# Enter the default password when prompted
+# Default password is 'raspberry' (change this after first login)
+```
+
+4. Change the default password (recommended):
+```bash
+# After logging in, run:
+passwd
+
+# Enter the current password (raspberry)
+# Enter your new password twice
+```
+
+5. Configure SSH connection in the notebooks:
+```python
+from eah_segmentation.ssh_utils import setup_ssh
+
+# Configure SSH connection
+ssh_config = {
+    'hostname': '192.168.1.100',  # Replace with your Raspberry Pi's IP
+    'username': 'pi',
+    'password': 'your_new_password'  # Use your new password
+}
+ssh_client = setup_ssh(ssh_config)
+```
+
+### Performance Considerations
+- Optimize model size for edge deployment
+- Monitor memory usage
+- Consider batch processing for efficiency
+- Use TFLite models for better performance
 
 ## Project Structure
 
 ```
 eah_segmentation/
 ├── notebooks/              # Jupyter notebooks
-│   ├── presentation_demo.ipynb  # For demonstrations
-│   └── student_practice.ipynb   # For student exercises
-├── models/                # Model files
-├── data/                  # Example images
-└── results/              # Output directory
+│   ├── presentation_demo.ipynb  # Interactive demonstrations
+│   └── student_practice.ipynb   # Learning exercises
+├── models/                # Model files and weights
+├── data/                  # Example images and test data
+└── results/              # Output directory for evaluations
 ```
 
 ## Requirements
 
+### System Requirements
 - Python 3.9 or higher
-- For local development: See `[project.optional-dependencies.dev]` in pyproject.toml
-- For Raspberry Pi: See environment_raspberry.yml
+- Sufficient disk space for models and dataset
+- GPU recommended for training (optional)
+
+### Development Dependencies
+See `[project.optional-dependencies.dev]` in pyproject.toml for full list:
+- Jupyter and JupyterLab
+- TensorFlow
+- Matplotlib
+- Paramiko (for SSH)
+
+### Raspberry Pi Requirements
+See environment_raspberry.yml for specific dependencies:
+- TensorFlow Lite
+- EdgeTPU runtime
+- Minimal dependencies for inference
+
+## Contributing
+
+We welcome contributions! Please feel free to submit pull requests or open issues for:
+- Bug reports
+- Feature requests
+- Documentation improvements
+- Performance optimizations
 
 ## License
 
