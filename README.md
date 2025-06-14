@@ -235,8 +235,7 @@ ssh_client = setup_ssh(ssh_config)
 ```
 eah_segmentation/
 ├── notebooks/              # Jupyter notebooks
-│   ├── presentation_demo.ipynb  # Interactive demonstrations
-│   └── student_practice.ipynb   # Learning exercises
+│   ├── segmentation_example.ipynb  # Interactive demonstrations
 ├── models/                # Model files and weights
 ├── data/                  # Example images and test data
 └── results/              # Output directory for evaluations
